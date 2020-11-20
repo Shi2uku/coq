@@ -195,7 +195,7 @@ let concl_next_tac =
 let process_goal sigma g =
   let env = Goal.V82.env sigma g in
   let min_env = Environ.reset_context env in
-  let id = Goal.uid g in
+  let id = if Printer.print_goal_names () then Names.Id.to_string (Termops.evar_suggested_name g sigma) else "" in
   let ccl =
     pr_letype_env ~goal_concl_style:true env sigma (Goal.V82.concl sigma g)
   in
@@ -206,7 +206,7 @@ let process_goal sigma g =
   let (_env, hyps) =
     Context.Compacted.fold process_hyp
       (Termops.compact_named_context (Environ.named_context env)) ~init:(min_env,[]) in
-  { Interface.goal_hyp = List.rev hyps; Interface.goal_ccl = ccl; Interface.goal_id = id; }
+  { Interface.goal_hyp = List.rev hyps; Interface.goal_ccl = ccl; Interface.goal_id = id }
 
 let process_goal_diffs diff_goal_map oldp nsigma ng =
   let open Evd in
@@ -317,7 +317,7 @@ let pattern_of_string ?env s =
     | None -> Global.env ()
     | Some e -> e
   in
-  let constr = Pcoq.parse_string Pcoq.Constr.lconstr_pattern s in
+  let constr = Pcoq.parse_string Pcoq.Constr.cpattern s in
   let (_, pat) = Constrintern.intern_constr_pattern env (Evd.from_env env) constr in
   pat
 
@@ -366,6 +366,17 @@ let export_option_state s = {
   Interface.opt_depr  = s.Goptions.opt_depr;
   Interface.opt_value = export_option_value s.Goptions.opt_value;
 }
+
+exception NotSupported of string
+
+let proof_diff (diff_opt, sid) =
+  let diff_opt = Proof_diffs.string_to_diffs diff_opt in
+  let doc = get_doc () in
+  match Stm.get_proof ~doc sid with
+  | None -> CErrors.user_err (Pp.str "No proofs to diff.")
+  | Some proof ->
+      let old = Stm.get_prev_proof ~doc sid in
+      Proof_diffs.diff_proofs ~diff_opt ?old proof
 
 let get_options () =
   let table = Goptions.get_tables () in
@@ -455,6 +466,7 @@ let eval_call c =
     Interface.hints = interruptible hints;
     Interface.status = interruptible status;
     Interface.search = interruptible search;
+    Interface.proof_diff = interruptible proof_diff;
     Interface.get_options = interruptible get_options;
     Interface.set_options = interruptible set_options;
     Interface.mkcases = interruptible idetop_make_cases;
@@ -479,6 +491,8 @@ let print_xml =
   let m = Mutex.create () in
   fun oc xml ->
     Mutex.lock m;
+    if !Flags.xml_debug then
+      Printf.printf "SENT --> %s\n%!" (Xml_printer.to_string_fmt xml);
     try Control.protect_sigalrm (Xml_printer.print oc) xml; Mutex.unlock m
     with e -> let e = Exninfo.capture e in Mutex.unlock m; Exninfo.iraise e
 
@@ -507,7 +521,7 @@ let loop run_mode ~opts:_ state =
   set_doc state.doc;
   init_signal_handler ();
   catch_break := false;
-  let in_ch, out_ch = Spawned.get_channels ()                        in
+  let in_ch, out_ch = Spawned.get_channels () in
   let xml_oc        = Xml_printer.make (Xml_printer.TChannel out_ch) in
   let in_lb         = Lexing.from_function (fun s len ->
                       CThread.thread_friendly_read in_ch s ~off:0 ~len) in
@@ -518,7 +532,8 @@ let loop run_mode ~opts:_ state =
   while not !quit do
     try
       let xml_query = Xml_parser.parse xml_ic in
-(*       pr_with_pid (Xml_printer.to_string_fmt xml_query); *)
+      if !Flags.xml_debug then
+        pr_with_pid (Xml_printer.to_string_fmt xml_query);
       let Xmlprotocol.Unknown q = Xmlprotocol.to_call xml_query in
       let () = pr_debug_call q in
       let r  = eval_call q in

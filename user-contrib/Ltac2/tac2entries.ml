@@ -24,29 +24,30 @@ open Tac2intern
 
 module Pltac =
 struct
-let tac2expr = Pcoq.Entry.create "tactic:tac2expr"
-let tac2expr_in_env = Pcoq.Entry.create "tactic:tac2expr_in_env"
+let ltac2_expr = Pcoq.Entry.create "ltac2_expr"
+let tac2expr = ltac2_expr
+let tac2expr_in_env = Pcoq.Entry.create "tac2expr_in_env"
 
-let q_ident = Pcoq.Entry.create "tactic:q_ident"
-let q_bindings = Pcoq.Entry.create "tactic:q_bindings"
-let q_with_bindings = Pcoq.Entry.create "tactic:q_with_bindings"
-let q_intropattern = Pcoq.Entry.create "tactic:q_intropattern"
-let q_intropatterns = Pcoq.Entry.create "tactic:q_intropatterns"
-let q_destruction_arg = Pcoq.Entry.create "tactic:q_destruction_arg"
-let q_induction_clause = Pcoq.Entry.create "tactic:q_induction_clause"
-let q_conversion = Pcoq.Entry.create "tactic:q_conversion"
-let q_rewriting = Pcoq.Entry.create "tactic:q_rewriting"
-let q_clause = Pcoq.Entry.create "tactic:q_clause"
-let q_dispatch = Pcoq.Entry.create "tactic:q_dispatch"
-let q_occurrences = Pcoq.Entry.create "tactic:q_occurrences"
-let q_reference = Pcoq.Entry.create "tactic:q_reference"
-let q_strategy_flag = Pcoq.Entry.create "tactic:q_strategy_flag"
-let q_constr_matching = Pcoq.Entry.create "tactic:q_constr_matching"
-let q_goal_matching = Pcoq.Entry.create "tactic:q_goal_matching"
-let q_hintdb = Pcoq.Entry.create "tactic:q_hintdb"
-let q_move_location = Pcoq.Entry.create "tactic:q_move_location"
-let q_pose = Pcoq.Entry.create "tactic:q_pose"
-let q_assert = Pcoq.Entry.create "tactic:q_assert"
+let q_ident = Pcoq.Entry.create "q_ident"
+let q_bindings = Pcoq.Entry.create "q_bindings"
+let q_with_bindings = Pcoq.Entry.create "q_with_bindings"
+let q_intropattern = Pcoq.Entry.create "q_intropattern"
+let q_intropatterns = Pcoq.Entry.create "q_intropatterns"
+let q_destruction_arg = Pcoq.Entry.create "q_destruction_arg"
+let q_induction_clause = Pcoq.Entry.create "q_induction_clause"
+let q_conversion = Pcoq.Entry.create "q_conversion"
+let q_rewriting = Pcoq.Entry.create "q_rewriting"
+let q_clause = Pcoq.Entry.create "q_clause"
+let q_dispatch = Pcoq.Entry.create "q_dispatch"
+let q_occurrences = Pcoq.Entry.create "q_occurrences"
+let q_reference = Pcoq.Entry.create "q_reference"
+let q_strategy_flag = Pcoq.Entry.create "q_strategy_flag"
+let q_constr_matching = Pcoq.Entry.create "q_constr_matching"
+let q_goal_matching = Pcoq.Entry.create "q_goal_matching"
+let q_hintdb = Pcoq.Entry.create "q_hintdb"
+let q_move_location = Pcoq.Entry.create "q_move_location"
+let q_pose = Pcoq.Entry.create "q_pose"
+let q_assert = Pcoq.Entry.create "q_assert"
 end
 
 (** Tactic definition *)
@@ -643,7 +644,7 @@ let perform_notation syn st =
   | Some lev -> Some (string_of_int lev)
   in
   let rule = (lev, None, [rule]) in
-  ([Pcoq.ExtendRule (Pltac.tac2expr, {Pcoq.pos=None; data=[rule]})], st)
+  ([Pcoq.ExtendRule (Pltac.ltac2_expr, {Pcoq.pos=None; data=[rule]})], st)
 
 let ltac2_notation =
   Pcoq.create_grammar_command "ltac2-notation" perform_notation
@@ -911,25 +912,19 @@ let print_ltac qid =
 
 (** Calling tactics *)
 
-let solve ~pstate default tac =
-  let pstate, status = Declare.Proof.map_fold_endline pstate ~f:(fun etac p ->
-    let with_end_tac = if default then Some etac else None in
-    let g = Goal_select.get_default_goal_selector () in
-    let (p, status) = Proof.solve g None tac ?with_end_tac p in
-    (* in case a strict subtree was completed,
-       go back to the top of the prooftree *)
-    let p = Proof.maximal_unfocus Vernacentries.command_focus p in
-    p, status)
-  in
-  if not status then Feedback.feedback Feedback.AddedAxiom;
-  pstate
-
-let call ~pstate ~default e =
+let ltac2_interp e =
   let loc = e.loc in
   let (e, t) = intern ~strict:false [] e in
   let () = check_unit ?loc t in
   let tac = Tac2interp.interp Tac2interp.empty_environment e in
-  solve ~pstate default (Proofview.tclIGNORE tac)
+  Proofview.tclIGNORE tac
+
+let ComTactic.Interpreter ltac2_interp = ComTactic.register_tactic_interpreter "ltac2" ltac2_interp
+
+let call ~pstate ~with_end_tac tac =
+  ComTactic.solve ~pstate ~with_end_tac
+    (Goal_select.get_default_goal_selector())
+    ~info:None (ltac2_interp tac)
 
 (** Primitive algebraic types than can't be defined Coq-side *)
 

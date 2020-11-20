@@ -198,22 +198,24 @@ let clear_in_global_msg = function
   | Some ref -> str " implicitly in " ++ Printer.pr_global ref
 
 let clear_dependency_msg env sigma id err inglobal =
+  let ppidupper = function Some id -> Id.print id | None -> str "This variable" in
+  let ppid = function Some id -> Id.print id | None -> str "this variable" in
   let pp = clear_in_global_msg inglobal in
   match err with
   | Evarutil.OccurHypInSimpleClause None ->
-      Id.print id ++ str " is used" ++ pp ++ str " in conclusion."
+      ppidupper id ++ str " is used" ++ pp ++ str " in conclusion."
   | Evarutil.OccurHypInSimpleClause (Some id') ->
-      Id.print id ++ strbrk " is used" ++ pp ++ str " in hypothesis " ++ Id.print id' ++ str"."
+      ppidupper id ++ strbrk " is used" ++ pp ++ str " in hypothesis " ++ Id.print id' ++ str"."
   | Evarutil.EvarTypingBreak ev ->
-      str "Cannot remove " ++ Id.print id ++
+      str "Cannot remove " ++ ppid id ++
       strbrk " without breaking the typing of " ++
       Printer.pr_existential env sigma ev ++ str"."
   | Evarutil.NoCandidatesLeft ev ->
-      str "Cannot remove " ++ Id.print id ++ str " as it would leave the existential " ++
+      str "Cannot remove " ++ ppid id ++ str " as it would leave the existential " ++
       Printer.pr_existential_key sigma ev ++ str" without candidates."
 
 let error_clear_dependency env sigma id err inglobal =
-  user_err (clear_dependency_msg env sigma id err inglobal)
+  user_err (clear_dependency_msg env sigma (Some id) err inglobal)
 
 let replacing_dependency_msg env sigma id err inglobal =
   let pp = clear_in_global_msg inglobal in
@@ -540,7 +542,7 @@ let mutual_fix f n rest j = Proofview.Goal.enter begin fun gl ->
   | (f, n, ar) :: oth ->
     let open Context.Named.Declaration in
     let (sp', u')  = check_mutind env sigma n ar in
-    if not (MutInd.equal sp sp') then
+    if not (QMutInd.equal env sp sp') then
       error "Fixpoints should be on the same mutual inductive declaration.";
     if mem_named_context_val f sign then
       user_err ~hdr:"Logic.prim_refiner"
@@ -724,7 +726,9 @@ type hyp_conversion =
 | StableHypConv (** Does not introduce new dependencies on variables *)
 | LocalHypConv (** Same as above plus no dependence on the named environment *)
 
-let e_change_in_hyps ~check ~reorder f args =
+let e_change_in_hyps ~check ~reorder f args = match args with
+| [] -> Proofview.tclUNIT ()
+| _ :: _ ->
   Proofview.Goal.enter begin fun gl ->
     let env = Proofview.Goal.env gl in
     let sigma = Tacmach.New.project gl in
@@ -2128,7 +2132,9 @@ let clear_body ids =
   end
 
 let clear_wildcards ids =
-  Tacticals.New.tclMAP (fun {CAst.loc;v=id} -> clear [id]) ids
+  let clear_wildcards_msg ?loc env sigma _id err inglobal =
+    user_err ?loc (clear_dependency_msg env sigma None err inglobal) in
+  Tacticals.New.tclMAP (fun {CAst.loc;v=id} -> clear_gen (clear_wildcards_msg ?loc) [id]) ids
 
 (*   Takes a list of booleans, and introduces all the variables
  *  quantified in the goal which are associated with a value
@@ -5181,14 +5187,14 @@ end
 
 (** Tacticals defined directly in term of Proofview *)
 module New = struct
-  open Genredexpr
-  open Locus
-
   let reduce_after_refine =
-    reduce
-      (Lazy {rBeta=true;rMatch=true;rFix=true;rCofix=true;
-             rZeta=false;rDelta=false;rConst=[]})
-      {onhyps = Some []; concl_occs = AllOccurrences }
+    (* For backward compatibility reasons, we do not contract let-ins, but we unfold them. *)
+    let redfun env t =
+      let open CClosure in
+      let flags = RedFlags.red_add_transparent allnolet TransparentState.empty in
+      clos_norm_flags flags env t
+    in
+    reduct_in_concl ~check:false (redfun,DEFAULTcast)
 
   let refine ~typecheck c =
     Refine.refine ~typecheck c <*>

@@ -55,11 +55,13 @@ module CInfo = struct
     (** Names to pre-introduce  *)
     ; impargs : Impargs.manual_implicits
     (** Explicitily declared implicit arguments  *)
+    ; using : Names.Id.Set.t option
+    (** Explicit declaration of section variables used by the constant *)
     }
 
 
-  let make ~name ~typ ?(args=[]) ?(impargs=[]) () =
-    { name; typ; args; impargs }
+  let make ~name ~typ ?(args=[]) ?(impargs=[]) ?using () =
+    { name; typ; args; impargs; using }
 
   let to_constr sigma thm = { thm with typ = EConstr.to_constr sigma thm.typ }
 
@@ -108,10 +110,10 @@ let default_univ_entry = Entries.Monomorphic_entry Univ.ContextSet.empty
 
 (** [univsbody] are universe-constraints attached to the body-only,
    used in vio-delayed opaque constants and private poly universes *)
-let definition_entry_core ?(opaque=false) ?(inline=false) ?feedback_id ?section_vars ?types
+let definition_entry_core ?(opaque=false) ?using ?(inline=false) ?feedback_id ?types
     ?(univs=default_univ_entry) ?(eff=Evd.empty_side_effects) ?(univsbody=Univ.ContextSet.empty) body =
   { proof_entry_body = Future.from_val ((body,univsbody), eff);
-    proof_entry_secctx = section_vars;
+    proof_entry_secctx = using;
     proof_entry_type = types;
     proof_entry_universes = univs;
     proof_entry_opaque = opaque;
@@ -119,7 +121,7 @@ let definition_entry_core ?(opaque=false) ?(inline=false) ?feedback_id ?section_
     proof_entry_inline_code = inline}
 
 let definition_entry =
-  definition_entry_core ?eff:None ?univsbody:None ?feedback_id:None ?section_vars:None
+  definition_entry_core ?eff:None ?univsbody:None ?feedback_id:None
 
 type 'a constant_entry =
   | DefinitionEntry of 'a proof_entry
@@ -162,7 +164,7 @@ let cache_constant ((sp,kn), obj) =
     then Constant.make1 kn
     else CErrors.anomaly Pp.(str"Missing constant " ++ Id.print(Libnames.basename sp) ++ str".")
   in
-  assert (Constant.equal kn' (Constant.make1 kn));
+  assert (Environ.QConstant.equal (Global.env ()) kn' (Constant.make1 kn));
   Nametab.push (Nametab.Until 1) sp (GlobRef.ConstRef (Constant.make1 kn));
   Dumpglob.add_constant_kind (Constant.make1 kn) obj.cst_kind
 
@@ -236,9 +238,9 @@ let pure_definition_entry ?(opaque=false) ?(inline=false) ?types
     proof_entry_feedback = None;
     proof_entry_inline_code = inline}
 
-let delayed_definition_entry ~opaque ?feedback_id ~section_vars ~univs ?types body =
+let delayed_definition_entry ~opaque ?feedback_id ~using ~univs ?types body =
   { proof_entry_body = body
-  ; proof_entry_secctx = section_vars
+  ; proof_entry_secctx = using
   ; proof_entry_type = types
   ; proof_entry_universes = univs
   ; proof_entry_opaque = opaque
@@ -608,8 +610,8 @@ let declare_mutually_recursive_core ~info ~cinfo ~opaque ~ntns ~uctx ~rec_declar
       uctx, univs
   in
   let csts = CList.map2
-      (fun CInfo.{ name; typ; impargs } body ->
-         let entry = definition_entry ~opaque ~types:typ ~univs body in
+      (fun CInfo.{ name; typ; impargs; using } body ->
+         let entry = definition_entry ~opaque ~types:typ ~univs ?using body in
          declare_entry ~name ~scope ~kind ~impargs ~uctx entry)
       cinfo fixdecls
   in
@@ -660,7 +662,7 @@ let check_evars_are_solved env sigma t =
   let evars = Evarutil.undefined_evars_of_term sigma t in
   if not (Evar.Set.is_empty evars) then error_unresolved_evars env sigma t evars
 
-let prepare_definition ~info ~opaque ~body ~typ sigma =
+let prepare_definition ~info ~opaque ?using ~body ~typ sigma =
   let { Info.poly; udecl; inline; _ } = info in
   let env = Global.env () in
   let sigma, (body, types) = Evarutil.finalize ~abort_on_undefined_evars:false
@@ -669,13 +671,13 @@ let prepare_definition ~info ~opaque ~body ~typ sigma =
   Option.iter (check_evars_are_solved env sigma) types;
   check_evars_are_solved env sigma body;
   let univs = Evd.check_univ_decl ~poly sigma udecl in
-  let entry = definition_entry ~opaque ~inline ?types ~univs body in
+  let entry = definition_entry ~opaque ?using ~inline ?types ~univs body in
   let uctx = Evd.evar_universe_context sigma in
   entry, uctx
 
 let declare_definition_core ~info ~cinfo ~opaque ~obls ~body sigma =
-  let { CInfo.name; impargs; typ; _ } = cinfo in
-  let entry, uctx = prepare_definition ~info ~opaque ~body ~typ sigma in
+  let { CInfo.name; impargs; typ; using; _ } = cinfo in
+  let entry, uctx = prepare_definition ~info ~opaque ?using ~body ~typ sigma in
   let { Info.scope; kind; hook; _ } = info in
   declare_entry_core ~name ~scope ~kind ~impargs ~obls ?hook ~uctx entry, uctx
 
@@ -725,7 +727,6 @@ module Obligation = struct
     ; obl_tac : unit Proofview.tactic option }
 
   let set_type ~typ obl = {obl with obl_type = typ}
-  let set_body ~body obl = {obl with obl_body = Some body}
 end
 
 type obligations = {obls : Obligation.t array; remaining : int}
@@ -804,6 +805,7 @@ module ProgramDecl = struct
     let set_uctx ~uctx prg = {prg with prg_uctx = uctx}
     let get_poly prg = prg.prg_info.Info.poly
     let get_obligations prg = prg.prg_obligations
+    let get_using prg = prg.prg_cinfo.CInfo.using
   end
 end
 
@@ -1138,7 +1140,7 @@ let declare_mutual_definition ~pm l =
     in
     let term = EConstr.to_constr sigma term in
     let typ = EConstr.to_constr sigma typ in
-    let def = (x.prg_reduce term, r, x.prg_reduce typ, x.prg_cinfo.CInfo.impargs) in
+    let def = (x.prg_reduce term, r, x.prg_reduce typ, x.prg_cinfo.CInfo.impargs, x.prg_cinfo.CInfo.using) in
     let oblsubst = List.map (fun (id, (_, c)) -> (id, c)) oblsubst in
     (def, oblsubst)
   in
@@ -1152,11 +1154,11 @@ let declare_mutual_definition ~pm l =
   (*   let fixdefs = List.map reduce_fix fixdefs in *)
   let fixdefs, fixrs, fixtypes, fixitems =
     List.fold_right2
-      (fun (d, r, typ, impargs) name (a1, a2, a3, a4) ->
+      (fun (d, r, typ, impargs, using) name (a1, a2, a3, a4) ->
         ( d :: a1
         , r :: a2
         , typ :: a3
-        , CInfo.{name; typ; impargs; args = []} :: a4 ))
+        , CInfo.{name; typ; impargs; args = []; using } :: a4 ))
       defs first.prg_deps ([], [], [], [])
   in
   let fixkind = Option.get first.prg_fixkind in
@@ -1289,7 +1291,7 @@ let obligation_terminator ~pm ~entry ~uctx ~oinfo:{name; num; auto} =
 
    FIXME: There is duplication of this code with obligation_terminator
    and Obligations.admit_obligations *)
-let obligation_admitted_terminator ~pm {name; num; auto} ctx' dref =
+let obligation_admitted_terminator ~pm {name; num; auto} uctx' dref =
   let prg = Option.get (State.find pm name) in
   let {obls; remaining = rem} = prg.prg_obligations in
   let obl = obls.(num) in
@@ -1301,21 +1303,21 @@ let obligation_admitted_terminator ~pm {name; num; auto} ctx' dref =
       if not transparent then err_not_transp ()
     | _ -> ()
   in
-  let inst, ctx' =
+  let inst, uctx' =
     if not prg.prg_info.Info.poly (* Not polymorphic *) then
       (* The universe context was declared globally, we continue
          from the new global environment. *)
-      let ctx = UState.from_env (Global.env ()) in
-      let ctx' = UState.merge_subst ctx (UState.subst ctx') in
-      (Univ.Instance.empty, ctx')
+      let uctx = UState.from_env (Global.env ()) in
+      let uctx' = UState.merge_subst uctx (UState.subst uctx') in
+      (Univ.Instance.empty, uctx')
     else
       (* We get the right order somehow, but surely it could be enforced in a clearer way. *)
-      let uctx = UState.context ctx' in
-      (Univ.UContext.instance uctx, ctx')
+      let uctx = UState.context uctx' in
+      (Univ.UContext.instance uctx, uctx')
   in
   let obl = {obl with obl_body = Some (DefinedObl (cst, inst))} in
   let () = if transparent then add_hint true prg cst in
-  update_program_decl_on_defined ~pm prg obls num obl ~uctx:ctx' rem ~auto
+  update_program_decl_on_defined ~pm prg obls num obl ~uctx:uctx' rem ~auto
 
 end
 
@@ -1377,7 +1379,7 @@ end
 
 type t =
   { endline_tactic : Genarg.glob_generic_argument option
-  ; section_vars : Id.Set.t option
+  ; using : Id.Set.t option
   ; proof : Proof.t
   ; initial_euctx : UState.t
   (** The initial universe context (for the statement) *)
@@ -1436,7 +1438,7 @@ let start_proof_core ~name ~typ ~pinfo ?(sign=initialize_named_context_for_proof
   let initial_euctx = Evd.evar_universe_context Proof.((data proof).sigma) in
   { proof
   ; endline_tactic = None
-  ; section_vars = None
+  ; using = None
   ; initial_euctx
   ; pinfo
   }
@@ -1459,7 +1461,7 @@ let start_dependent ~info ~name ~proof_ending goals =
   let pinfo = Proof_info.make ~info ~cinfo ~proof_ending () in
   { proof
   ; endline_tactic = None
-  ; section_vars = None
+  ; using = None
   ; initial_euctx
   ; pinfo
   }
@@ -1524,7 +1526,7 @@ let start_mutual_with_initialization ~info ~cinfo ~mutual_info sigma snl =
     map lemma ~f:(fun p ->
         pi1 @@ Proof.run_tactic Global.(env ()) init_tac p)
 
-let get_used_variables pf = pf.section_vars
+let get_used_variables pf = pf.using
 let get_universe_decl pf = pf.pinfo.Proof_info.info.Info.udecl
 
 let set_used_variables ps l =
@@ -1548,9 +1550,9 @@ let set_used_variables ps l =
        else (ctx, all_safe) in
   let ctx, _ =
     Environ.fold_named_context aux env ~init:(ctx,ctx_set) in
-  if not (Option.is_empty ps.section_vars) then
+  if not (Option.is_empty ps.using) then
     CErrors.user_err Pp.(str "Used section variables can be declared only once");
-  ctx, { ps with section_vars = Some (Context.Named.to_vars ctx) }
+  ctx, { ps with using = Some (Context.Named.to_vars ctx) }
 
 let get_open_goals ps =
   let Proof.{ goals; stack; sigma } = Proof.data ps.proof in
@@ -1625,12 +1627,12 @@ let make_univs_deferred ~poly ~initial_euctx ~uctx ~udecl
 
 let make_univs_private_poly ~poly ~uctx ~udecl (used_univs_typ, typ) (used_univs_body, body) =
   let used_univs = Univ.LSet.union used_univs_body used_univs_typ in
-  let universes = UState.restrict uctx used_univs in
-  let typus = UState.restrict universes used_univs_typ in
-  let utyp = UState.check_univ_decl ~poly typus udecl in
+  let uctx = UState.restrict uctx used_univs in
+  let uctx' = UState.restrict uctx used_univs_typ in
+  let utyp = UState.check_univ_decl ~poly uctx' udecl in
   let ubody = Univ.ContextSet.diff
-      (UState.context_set universes)
-      (UState.context_set typus)
+      (UState.context_set uctx)
+      (UState.context_set uctx')
   in
   utyp, ubody
 
@@ -1641,13 +1643,13 @@ let make_univs ~poly ~uctx ~udecl (used_univs_typ, typ) (used_univs_body, body) 
      for the typ. We recheck the declaration after restricting with
      the actually used universes.
      TODO: check if restrict is really necessary now. *)
-  let ctx = UState.restrict uctx used_univs in
-  let utyp = UState.check_univ_decl ~poly ctx udecl in
+  let uctx = UState.restrict uctx used_univs in
+  let utyp = UState.check_univ_decl ~poly uctx udecl in
   utyp, Univ.ContextSet.empty
 
 let close_proof ~opaque ~keep_body_ucst_separate ps =
 
-  let { section_vars; proof; initial_euctx; pinfo } = ps in
+  let { using; proof; initial_euctx; pinfo } = ps in
   let { Proof_info.info = { Info.udecl } } = pinfo in
   let { Proof.name; poly } = Proof.data proof in
   let unsafe_typ = keep_body_ucst_separate && not poly in
@@ -1668,7 +1670,7 @@ let close_proof ~opaque ~keep_body_ucst_separate ps =
       then make_univs_private_poly ~poly ~uctx ~udecl t b
       else make_univs ~poly ~uctx ~udecl t b
     in
-    definition_entry_core ~opaque ?section_vars ~univs:utyp ~univsbody:ubody ~types:typ ~eff body
+    definition_entry_core ~opaque ?using ~univs:utyp ~univsbody:ubody ~types:typ ~eff body
   in
   let entries = CList.map make_entry elist  in
   { name; entries; uctx }
@@ -1676,7 +1678,7 @@ let close_proof ~opaque ~keep_body_ucst_separate ps =
 type closed_proof_output = (Constr.t * Evd.side_effects) list * UState.t
 
 let close_proof_delayed ~feedback_id ps (fpl : closed_proof_output Future.computation) =
-  let { section_vars; proof; initial_euctx; pinfo } = ps in
+  let { using; proof; initial_euctx; pinfo } = ps in
   let { Proof_info.info = { Info.udecl } } = pinfo in
   let { Proof.name; poly; entry; sigma } = Proof.data proof in
 
@@ -1710,10 +1712,10 @@ let close_proof_delayed ~feedback_id ps (fpl : closed_proof_output Future.comput
             (Vars.universes_of_constr types)
             (Vars.universes_of_constr pt)
         in
-        let univs = UState.restrict uctx used_univs in
-        let univs = UState.check_mono_univ_decl univs udecl in
-        (pt,univs),eff)
-    |> delayed_definition_entry ~opaque ~feedback_id ~section_vars ~univs ~types
+        let uctx = UState.restrict uctx used_univs in
+        let uctx = UState.check_mono_univ_decl uctx udecl in
+        (pt,uctx),eff)
+    |> delayed_definition_entry ~opaque ~feedback_id ~using ~univs ~types
   in
   let entries = Future.map2 make_entry fpl (Proofview.initial_goals entry) in
   { name; entries; uctx = initial_euctx }
@@ -1855,7 +1857,8 @@ module MutualEntry : sig
   val declare_variable
     : pinfo:Proof_info.t
     -> uctx:UState.t
-    -> Entries.parameter_entry
+    -> sec_vars:Id.Set.t option
+    -> univs:Entries.universes_entry
     -> Names.GlobRef.t list
 
   val declare_mutdef
@@ -1921,10 +1924,11 @@ end = struct
     in
     List.map_i (declare_mutdef ~pinfo ~uctx pe) 0 pinfo.Proof_info.cinfo
 
-  let declare_variable ~pinfo ~uctx pe =
+  let declare_variable ~pinfo ~uctx ~sec_vars ~univs =
     let { Info.scope; hook } = pinfo.Proof_info.info in
     List.map_i (
       fun i { CInfo.name; typ; impargs } ->
+        let pe = (sec_vars, (typ, univs), None) in
         declare_assumption ~name ~scope ~hook ~impargs ~uctx pe
     ) 0 pinfo.Proof_info.cinfo
 
@@ -1954,8 +1958,8 @@ let compute_proof_using_for_admitted proof typ pproofs =
       Some (Environ.really_needed env (Id.Set.union ids_typ ids_def))
     | _ -> None
 
-let finish_admitted ~pm ~pinfo ~uctx pe =
-  let cst = MutualEntry.declare_variable ~pinfo ~uctx pe in
+let finish_admitted ~pm ~pinfo ~uctx ~sec_vars ~univs =
+  let cst = MutualEntry.declare_variable ~pinfo ~uctx ~sec_vars ~univs in
   (* If the constant was an obligation we need to update the program map *)
   match CEphemeron.get pinfo.Proof_info.proof_ending with
   | Proof_ending.End_obligation oinfo ->
@@ -1975,7 +1979,7 @@ let save_admitted ~pm ~proof =
   let sec_vars = compute_proof_using_for_admitted proof typ pproofs in
   let uctx = get_initial_euctx proof in
   let univs = UState.check_univ_decl ~poly uctx udecl in
-  finish_admitted ~pm ~pinfo:proof.pinfo ~uctx (sec_vars, (typ, univs), None)
+  finish_admitted ~pm ~pinfo:proof.pinfo ~uctx ~sec_vars ~univs
 
 (************************************************************************)
 (* Saving a lemma-like constant                                         *)
@@ -2098,12 +2102,9 @@ let save_lemma_admitted_delayed ~pm ~proof ~pinfo =
   let poly = match proof_entry_universes with
     | Entries.Monomorphic_entry _ -> false
     | Entries.Polymorphic_entry (_, _) -> true in
-  let typ = match proof_entry_type with
-    | None -> CErrors.user_err Pp.(str "Admitted requires an explicit statement");
-    | Some typ -> typ in
-  let ctx = UState.univ_entry ~poly uctx in
+  let univs = UState.univ_entry ~poly uctx in
   let sec_vars = if get_keep_admitted_vars () then proof_entry_secctx else None in
-  finish_admitted ~pm ~uctx ~pinfo (sec_vars, (typ, ctx), None)
+  finish_admitted ~pm ~uctx ~pinfo ~sec_vars ~univs
 
 let save_lemma_proved_delayed ~pm ~proof ~pinfo ~idopt =
   (* vio2vo calls this but with invalid info, we have to workaround
@@ -2208,25 +2209,59 @@ let warn_solve_errored =
         ; fnl ()
         ; str "This will become an error in the future" ])
 
-let solve_by_tac ?loc name evi t ~poly ~uctx =
-  (* the status is dropped. *)
+let solve_by_tac prg obls i tac =
+  let obl = obls.(i) in
+  let obl = subst_deps_obl obls obl in
+  let tac = Option.(default !default_tactic (append tac obl.obl_tac)) in
+  let uctx = Internal.get_uctx prg in
+  let uctx = UState.update_sigma_univs uctx (Global.universes ()) in
+  let poly = Internal.get_poly prg in
+  let evi = evar_of_obligation obl in
+  (* the status of [build_by_tactic] is dropped. *)
   try
     let env = Global.env () in
     let body, types, _univs, _, uctx =
-      build_by_tactic env ~uctx ~poly ~typ:evi.evar_concl t in
+      build_by_tactic env ~uctx ~poly ~typ:evi.evar_concl tac in
     Inductiveops.control_only_guard env (Evd.from_ctx uctx) (EConstr.of_constr body);
     Some (body, types, uctx)
   with
   | Tacticals.FailError (_, s) as exn ->
     let _ = Exninfo.capture exn in
+    let loc = fst obl.obl_location in
     CErrors.user_err ?loc ~hdr:"solve_obligation" (Lazy.force s)
   (* If the proof is open we absorb the error and leave the obligation open *)
   | Proof_.OpenProof _ ->
     None
   | e when CErrors.noncritical e ->
     let err = CErrors.print e in
+    let loc = fst obl.obl_location in
     warn_solve_errored ?loc err;
     None
+
+let solve_and_declare_by_tac prg obls i tac =
+  match solve_by_tac prg obls i tac with
+  | None -> None
+  | Some (t, ty, uctx) ->
+    let obl = obls.(i) in
+    let poly = Internal.get_poly prg in
+    let prg = ProgramDecl.Internal.set_uctx ~uctx prg in
+    let def, obl', _cst = declare_obligation prg obl ~body:t ~types:ty ~uctx in
+    obls.(i) <- obl';
+    if def && not poly then (
+      (* Declare the term constraints with the first obligation only *)
+      let uctx_global = UState.from_env (Global.env ()) in
+      let uctx = UState.merge_subst uctx_global (UState.subst uctx) in
+      Some (ProgramDecl.Internal.set_uctx ~uctx prg))
+    else Some prg
+
+let solve_obligation_by_tac prg obls i tac =
+  let obl = obls.(i) in
+  match obl.obl_body with
+  | Some _ -> None
+  | None ->
+    if List.is_empty (deps_remaining obls obl.obl_deps)
+    then solve_and_declare_by_tac prg obls i tac
+    else None
 
 let get_unique_prog ~pm prg =
   match State.get_unique_open_prog pm prg with
@@ -2257,56 +2292,14 @@ let rec solve_obligation prg num tac =
     let name = Internal.get_name prg in
     Proof_ending.End_obligation {name; num; auto}
   in
-  let cinfo = CInfo.make ~name:obl.obl_name ~typ:(EConstr.of_constr obl.obl_type) () in
+  let using = Internal.get_using prg in
+  let cinfo = CInfo.make ~name:obl.obl_name ~typ:(EConstr.of_constr obl.obl_type) ?using () in
   let poly = Internal.get_poly prg in
   let info = Info.make ~scope ~kind ~poly () in
   let lemma = Proof.start_core ~cinfo ~info ~proof_ending evd  in
   let lemma = fst @@ Proof.by !default_tactic lemma in
   let lemma = Option.cata (fun tac -> Proof.set_endline_tactic tac lemma) lemma tac in
   lemma
-
-and obligation (user_num, name, typ) ~pm tac =
-  let num = pred user_num in
-  let prg = get_unique_prog ~pm name in
-  let { obls; remaining } = Internal.get_obligations prg in
-  if num >= 0 && num < Array.length obls then
-    let obl = obls.(num) in
-    match obl.obl_body with
-    | None -> solve_obligation prg num tac
-    | Some r -> Error.already_solved num
-  else Error.unknown_obligation num
-
-and solve_obligation_by_tac prg obls i tac =
-  let obl = obls.(i) in
-    match obl.obl_body with
-    | Some _ -> None
-    | None ->
-      if List.is_empty (deps_remaining obls obl.obl_deps) then
-        let obl = subst_deps_obl obls obl in
-        let tac =
-          match tac with
-          | Some t -> t
-          | None ->
-            match obl.obl_tac with
-            | Some t -> t
-            | None -> !default_tactic
-        in
-        let uctx = Internal.get_uctx prg in
-        let uctx = UState.update_sigma_univs uctx (Global.universes ()) in
-        let poly = Internal.get_poly prg in
-        match solve_by_tac ?loc:(fst obl.obl_location) obl.obl_name (evar_of_obligation obl) tac ~poly ~uctx with
-        | None -> None
-        | Some (t, ty, uctx) ->
-          let prg = ProgramDecl.Internal.set_uctx ~uctx prg in
-          let def, obl', _cst = declare_obligation prg obl ~body:t ~types:ty ~uctx in
-          obls.(i) <- obl';
-          if def && not poly then (
-            (* Declare the term constraints with the first obligation only *)
-            let uctx_global = UState.from_env (Global.env ()) in
-            let uctx = UState.merge_subst uctx_global (UState.subst uctx) in
-            Some (ProgramDecl.Internal.set_uctx ~uctx prg))
-          else Some prg
-      else None
 
 and solve_prg_obligations ~pm prg ?oblset tac =
   let { obls; remaining } = Internal.get_obligations prg in
@@ -2334,15 +2327,21 @@ and solve_prg_obligations ~pm prg ?oblset tac =
   in
   update_obls ~pm prg obls' !rem
 
-and solve_obligations ~pm n tac =
+and auto_solve_obligations ~pm n ?oblset tac : State.t * progress =
+  Flags.if_verbose Feedback.msg_info
+    (str "Solving obligations automatically...");
+  let prg = get_unique_prog ~pm n in
+  solve_prg_obligations ~pm prg ?oblset tac
+
+let solve_obligations ~pm n tac =
   let prg = get_unique_prog ~pm n in
   solve_prg_obligations ~pm prg tac
 
-and solve_all_obligations ~pm tac =
+let solve_all_obligations ~pm tac =
   State.fold pm ~init:pm ~f:(fun k v pm ->
       solve_prg_obligations ~pm v tac |> fst)
 
-and try_solve_obligation ~pm n prg tac =
+let try_solve_obligation ~pm n prg tac =
   let prg = get_unique_prog ~pm prg in
   let {obls; remaining} = Internal.get_obligations prg in
   let obls' = Array.copy obls in
@@ -2352,14 +2351,19 @@ and try_solve_obligation ~pm n prg tac =
     pm
   | None -> pm
 
-and try_solve_obligations ~pm n tac =
+let try_solve_obligations ~pm n tac =
   solve_obligations ~pm n tac |> fst
 
-and auto_solve_obligations ~pm n ?oblset tac : State.t * progress =
-  Flags.if_verbose Feedback.msg_info
-    (str "Solving obligations automatically...");
-  let prg = get_unique_prog ~pm n in
-  solve_prg_obligations ~pm prg ?oblset tac
+let obligation (user_num, name, typ) ~pm tac =
+  let num = pred user_num in
+  let prg = get_unique_prog ~pm name in
+  let { obls; remaining } = Internal.get_obligations prg in
+  if num >= 0 && num < Array.length obls then
+    let obl = obls.(num) in
+    match obl.obl_body with
+    | None -> solve_obligation prg num tac
+    | Some r -> Error.already_solved num
+  else Error.unknown_obligation num
 
 let show_single_obligation i n obls x =
   let x = subst_deps_obl obls x in
@@ -2464,32 +2468,25 @@ let add_mutual_definitions l ~pm ~info ?obl_hook ~uctx
   in
   pm
 
-let admit_prog ~pm prg =
-  let {obls; remaining} = Internal.get_obligations prg in
-  let obls = Array.copy obls in
-    Array.iteri
-      (fun i x ->
-        match x.obl_body with
-        | None ->
-            let x = subst_deps_obl obls x in
-            let uctx = Internal.get_uctx prg in
-            let univs = UState.univ_entry ~poly:false uctx in
-            let kn = declare_constant ~name:x.obl_name ~local:Locality.ImportNeedQualified
-              (ParameterEntry (None, (x.obl_type, univs), None)) ~kind:Decls.(IsAssumption Conjectural)
-            in
-              assumption_message x.obl_name;
-              obls.(i) <- Obligation.set_body ~body:(DefinedObl (kn, Univ.Instance.empty)) x
-        | Some _ -> ())
-      obls;
-  Obls_.update_obls ~pm prg obls 0
+let rec admit_prog ~pm prg =
+  let {obls} = Internal.get_obligations prg in
+  let is_open _ x = Option.is_empty x.obl_body && List.is_empty (deps_remaining obls x.obl_deps) in
+  let i = match Array.findi is_open obls with
+    | Some i -> i
+    | None -> CErrors.anomaly (Pp.str "Could not find a solvable obligation.")
+  in
+  let proof = solve_obligation prg i None in
+  let pm = Proof.save_admitted ~pm ~proof in
+  match ProgMap.find_opt (Internal.get_name prg) pm with
+  | Some prg -> admit_prog ~pm (CEphemeron.get prg)
+  | None -> pm
 
-(* get_any_prog *)
 let rec admit_all_obligations ~pm =
   let prg = State.first_pending pm in
   match prg with
   | None -> pm
   | Some prg ->
-    let pm, _prog = admit_prog ~pm prg in
+    let pm = admit_prog ~pm prg in
     admit_all_obligations ~pm
 
 let admit_obligations ~pm n =
@@ -2497,12 +2494,17 @@ let admit_obligations ~pm n =
   | None -> admit_all_obligations ~pm
   | Some _ ->
     let prg = get_unique_prog ~pm n in
-    let pm, _ = admit_prog ~pm prg in
+    let pm = admit_prog ~pm prg in
     pm
 
 let next_obligation ~pm n tac =
   let prg = match n with
-    | None -> State.first_pending pm |> Option.get
+    | None ->
+      begin match State.first_pending pm with
+        | Some prg -> prg
+        | None ->
+          Error.no_obligations None
+      end
     | Some _ -> get_unique_prog ~pm n
   in
   let {obls; remaining} = Internal.get_obligations prg in

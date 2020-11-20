@@ -227,8 +227,7 @@ let recheck_applications unify flags env evdref t =
             (match unify flags TypeUnification env !evdref Reduction.CUMUL argsty.(i) dom with
              | Success evd -> evdref := evd;
                              aux (succ i) (subst1 args.(i) codom)
-             | UnifFailure (evd, reason) ->
-                Pretype_errors.error_cannot_unify env evd ~reason (argsty.(i), dom))
+             | UnifFailure (evd, reason) -> raise (IllTypedInstance (env, ty, argsty.(i))))
          | _ -> raise (IllTypedInstance (env, ty, argsty.(i)))
        else ()
      in aux 0 fty
@@ -810,7 +809,8 @@ let check_evar_instance unify flags env evd evk1 body =
   (* This happens in practice, cf MathClasses build failure on 2013-3-15 *)
   let ty =
     try Retyping.get_type_of ~lax:true evenv evd body
-    with Retyping.RetypeError _ -> user_err (Pp.(str "Ill-typed evar instance"))
+    with Retyping.RetypeError _ ->
+      let loc, _ = evi.evar_source in user_err ?loc (Pp.(str "Ill-typed evar instance"))
   in
   match unify flags TypeUnification evenv evd Reduction.CUMUL ty evi.evar_concl with
   | Success evd -> evd
@@ -934,13 +934,6 @@ let project_with_effects aliases sigma t subst =
     with Not_found -> accu
   in
   filter_solution (Int.Map.fold is_projectable subst [])
-
-open Context.Named.Declaration
-let rec find_solution_type evarenv = function
-  | (id,ProjectVar)::l -> get_type (lookup_named id evarenv)
-  | [id,ProjectEvar _] -> (* bugged *) get_type (lookup_named id evarenv)
-  | (id,ProjectEvar _)::l -> find_solution_type evarenv l
-  | [] -> assert false
 
 (* In case the solution to a projection problem requires the instantiation of
  * subsidiary evars, [do_projection_effects] performs them; it
@@ -1196,8 +1189,8 @@ let postpone_non_unique_projection env evd pbty (evk,argsv as ev) sols rhs =
 let filter_compatible_candidates unify flags env evd evi args rhs c =
   let c' = instantiate_evar_array evi c args in
   match unify flags TermUnification env evd Reduction.CONV rhs c' with
-  | Success evd -> Some (c,evd)
-  | UnifFailure _ -> None
+  | Success evd -> Inl (c,evd)
+  | UnifFailure _ -> Inr c'
 
 (* [restrict_candidates ... filter ev1 ev2] restricts the candidates
    of ev1, removing those not compatible with the filter, as well as
@@ -1218,8 +1211,8 @@ let restrict_candidates unify flags env evd filter1 (evk1,argsv1) (evk2,argsv2) 
         let filter c2 =
           let compatibility = filter_compatible_candidates unify flags env evd evi2 argsv2 c1' c2 in
           match compatibility with
-          | None -> false
-          | Some _ -> true
+          | Inl _ -> true
+          | Inr _ -> false
         in
         let filtered = List.filter filter l2 in
         match filtered with [] -> false | _ -> true) l1 in
@@ -1440,29 +1433,33 @@ let solve_refl ?(can_drop=false) unify flags env evd pbty evk argsv1 argsv2 =
    in advance, we check which of them apply *)
 
 exception NoCandidates
-exception IncompatibleCandidates
+exception IncompatibleCandidates of EConstr.t
 
 let solve_candidates unify flags env evd (evk,argsv) rhs =
   let evi = Evd.find evd evk in
   match evi.evar_candidates with
   | None -> raise NoCandidates
   | Some l ->
-      let l' =
-        List.map_filter
-          (fun c -> filter_compatible_candidates unify flags env evd evi argsv rhs c) l in
-      match l' with
-      | [] -> raise IncompatibleCandidates
-      | [c,evd] ->
+      let rec aux = function
+        | [] -> [], []
+        | c::l ->
+           let compatl, disjointl = aux l in
+           match filter_compatible_candidates unify flags env evd evi argsv rhs c with
+           | Inl c -> c::compatl, disjointl
+           | Inr c -> compatl, c::disjointl in
+      match aux l with
+      | [], c::_ -> raise (IncompatibleCandidates c)
+      | [c,evd], _ ->
           (* solve_candidates might have been called recursively in the mean *)
           (* time and the evar been solved by the filtering process *)
          if Evd.is_undefined evd evk then
            let evd' = Evd.define evk c evd in
              check_evar_instance unify flags env evd' evk c
          else evd
-      | l when List.length l < List.length l' ->
+      | l, _::_  (* At least one discarded candidate *) ->
           let candidates = List.map fst l in
           restrict_evar evd evk None (UpdateWith candidates)
-      | l -> evd
+      | l, [] -> evd
 
 let occur_evar_upto_types sigma n c =
   let c = EConstr.Unsafe.to_constr c in
@@ -1548,10 +1545,10 @@ let rec invert_definition unify flags choose imitate_defs
             raise (NotEnoughInformationToProgress sols);
           (* No unique projection but still restrict to where it is possible *)
           (* materializing is necessary, but is restricting useful? *)
-          let ty = find_solution_type (evar_filtered_env env evi) sols in
-          let ty' = instantiate_evar_array evi ty argsv in
+          let t' = of_alias t in
+          let ty = Retyping.get_type_of env !evdref t' in
           let (evd,evar,(evk',argsv' as ev')) =
-            materialize_evar (evar_define unify flags ~choose) env !evdref 0 ev ty' in
+            materialize_evar (evar_define unify flags ~choose) env !evdref 0 ev ty in
           let ts = expansions_of_var evd aliases t in
           let test c = isEvar evd c || List.exists (is_alias evd c) ts in
           let filter = restrict_upon_filter evd evk test argsv' in
@@ -1560,7 +1557,7 @@ let rec invert_definition unify flags choose imitate_defs
           let evd = match candidates with
           | NoUpdate ->
             let evd, ev'' = restrict_applied_evar evd ev' filter NoUpdate in
-            add_conv_oriented_pb ~tail:false (None,env,mkEvar ev'',of_alias t) evd
+            add_conv_oriented_pb ~tail:false (None,env,mkEvar ev'',t') evd
           | UpdateWith _ ->
             restrict_evar evd evk' filter candidates
           in
@@ -1571,7 +1568,7 @@ let rec invert_definition unify flags choose imitate_defs
     match EConstr.kind !evdref t with
     | Rel i when i>k ->
         let open Context.Rel.Declaration in
-        (match Environ.lookup_rel (i-k) env' with
+        (match Environ.lookup_rel i env' with
         | LocalAssum _ -> project_variable (RelAlias (i-k))
         | LocalDef (_,b,_) ->
           try project_variable (RelAlias (i-k))
@@ -1794,6 +1791,6 @@ let solve_simple_eqn unify flags ?(choose=false) ?(imitate_defs=true)
         UnifFailure (evd,MetaOccurInBody evk1)
     | IllTypedInstance (env,t,u) ->
         UnifFailure (evd,InstanceNotSameType (evk1,env,t,u))
-    | IncompatibleCandidates ->
-        UnifFailure (evd,ConversionFailed (env,mkEvar ev1,t2))
+    | IncompatibleCandidates t ->
+        UnifFailure (evd,IncompatibleInstances (env,ev1,t,t2))
 

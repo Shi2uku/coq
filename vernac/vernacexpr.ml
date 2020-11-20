@@ -106,8 +106,7 @@ type search_restriction =
 
 type verbose_flag   = bool (* true = Verbose;       false = Silent         *)
 type coercion_flag  = bool (* true = AddCoercion    false = NoCoercion     *)
-type instance_flag  = bool option
-  (* Some true = Backward instance; Some false = Forward instance, None = NoInstance *)
+type instance_flag  = BackInstance | NoInstance
 
 type export_flag    = bool (* true = Export;        false = Import         *)
 
@@ -168,8 +167,8 @@ type fixpoint_expr = recursion_order_expr option fix_expr_gen
 type cofixpoint_expr = unit fix_expr_gen
 
 type local_decl_expr =
-  | AssumExpr of lname * constr_expr
-  | DefExpr of lname * constr_expr * constr_expr option
+  | AssumExpr of lname * local_binder_expr list * constr_expr
+  | DefExpr of lname * local_binder_expr list * constr_expr * constr_expr option
 
 type inductive_kind = Inductive_kw | CoInductive | Variant | Record | Structure | Class of bool (* true = definitional, false = inductive *)
 type simple_binder = lident list  * constr_expr
@@ -190,8 +189,9 @@ type inductive_params_expr = local_binder_expr list * local_binder_expr list opt
 (** If the option is nonempty the "|" marker was used *)
 
 type inductive_expr =
-  ident_decl with_coercion * inductive_params_expr * constr_expr option *
-    constructor_list_or_record_decl_expr
+  cumul_ident_decl with_coercion
+  * inductive_params_expr * constr_expr option
+  * constructor_list_or_record_decl_expr
 
 type one_inductive_expr =
   lident * inductive_params_expr * constr_expr option * constructor_expr list

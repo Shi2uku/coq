@@ -43,7 +43,6 @@ type key = int CEphemeron.key option ref
 
 type link_info =
   | Linked of string
-  | LinkedInteractive of string
   | NotLinked
 
 type constant_key = Opaqueproof.opaque constant_body * (link_info ref * key)
@@ -104,7 +103,6 @@ type env = {
   env_typing_flags  : typing_flags;
   retroknowledge : Retroknowledge.retroknowledge;
   indirect_pterms : Opaqueproof.opaquetab;
-  native_symbols : Nativevalues.symbols DPmap.t;
 }
 
 let empty_named_context_val = {
@@ -136,7 +134,6 @@ let empty_env = {
   env_typing_flags = Declareops.safe_flags Conv_oracle.empty;
   retroknowledge = Retroknowledge.empty;
   indirect_pterms = Opaqueproof.empty_opaquetab;
-  native_symbols = DPmap.empty;
 }
 
 
@@ -273,6 +270,11 @@ let is_impredicative_sort env = function
   | Sorts.Type _ -> false
 
 let is_impredicative_univ env u = is_impredicative_sort env (Sorts.sort_of_univ u)
+
+let is_impredicative_family env = function
+  | Sorts.InSProp | Sorts.InProp -> true
+  | Sorts.InSet -> is_impredicative_set env
+  | Sorts.InType -> false
 
 let type_in_type env = not (typing_flags env).check_universes
 let deactivated_guard env = not (typing_flags env).check_guarded
@@ -467,13 +469,21 @@ let same_flags {
 [@warning "+9"]
 
 let set_cumulative_sprop b = map_universes (UGraph.set_cumulative_sprop b)
+let set_type_in_type b = map_universes (UGraph.set_type_in_type b)
 
 let set_typing_flags c env =
   if same_flags env.env_typing_flags c then env
-  else set_cumulative_sprop c.cumulative_sprop { env with env_typing_flags = c }
+  else
+    let env = { env with env_typing_flags = c } in
+    let env = set_cumulative_sprop c.cumulative_sprop env in
+    let env = set_type_in_type (not c.check_universes) env in
+    env
 
 let set_cumulative_sprop b env =
   set_typing_flags {env.env_typing_flags with cumulative_sprop=b} env
+
+let set_type_in_type b env =
+  set_typing_flags {env.env_typing_flags with check_universes=not b} env
 
 let set_allow_sprop b env =
   { env with env_stratification =
@@ -557,6 +567,11 @@ let is_primitive env c =
   match cb.Declarations.const_body with
   | Declarations.Primitive _ -> true
   | _ -> false
+
+let is_array_type env c =
+  match env.retroknowledge.Retroknowledge.retro_array with
+  | None -> false
+  | Some c' -> Constant.CanOrd.equal c c'
 
 let polymorphic_constant cst env =
   Declareops.constant_is_polymorphic (lookup_constant cst env)
@@ -816,6 +831,65 @@ let is_type_in_type env r =
 
 let set_retroknowledge env r = { env with retroknowledge = r }
 
-let set_native_symbols env native_symbols = { env with native_symbols }
-let add_native_symbols dir syms env =
-  { env with native_symbols = DPmap.add dir syms env.native_symbols }
+module type QNameS =
+sig
+  type t
+  val equal : env -> t -> t -> bool
+  val compare : env -> t -> t -> int
+  val hash : env -> t -> int
+end
+
+module QConstant =
+struct
+  type t = Constant.t
+  let equal _env c1 c2 = Constant.CanOrd.equal c1 c2
+  let compare _env c1 c2 = Constant.CanOrd.compare c1 c2
+  let hash _env c = Constant.CanOrd.hash c
+end
+
+module QMutInd =
+struct
+  type t = MutInd.t
+  let equal _env c1 c2 = MutInd.CanOrd.equal c1 c2
+  let compare _env c1 c2 = MutInd.CanOrd.compare c1 c2
+  let hash _env c = MutInd.CanOrd.hash c
+end
+
+module QInd =
+struct
+  type t = Ind.t
+  let equal _env c1 c2 = Ind.CanOrd.equal c1 c2
+  let compare _env c1 c2 = Ind.CanOrd.compare c1 c2
+  let hash _env c = Ind.CanOrd.hash c
+end
+
+module QConstruct =
+struct
+  type t = Construct.t
+  let equal _env c1 c2 = Construct.CanOrd.equal c1 c2
+  let compare _env c1 c2 = Construct.CanOrd.compare c1 c2
+  let hash _env c = Construct.CanOrd.hash c
+end
+
+module QProjection =
+struct
+  type t = Projection.t
+  let equal _env c1 c2 = Projection.CanOrd.equal c1 c2
+  let compare _env c1 c2 = Projection.CanOrd.compare c1 c2
+  let hash _env c = Projection.CanOrd.hash c
+  module Repr =
+  struct
+    type t = Projection.Repr.t
+    let equal _env c1 c2 = Projection.Repr.CanOrd.equal c1 c2
+    let compare _env c1 c2 = Projection.Repr.CanOrd.compare c1 c2
+    let hash _env c = Projection.Repr.CanOrd.hash c
+  end
+end
+
+module QGlobRef =
+struct
+  type t = GlobRef.t
+  let equal _env c1 c2 = GlobRef.CanOrd.equal c1 c2
+  let compare _env c1 c2 = GlobRef.CanOrd.compare c1 c2
+  let hash _env c = GlobRef.CanOrd.hash c
+end

@@ -205,12 +205,6 @@ module Level = struct
 
   let pr u = str (to_string u)
 
-  let apart u v =
-    match data u, data v with
-    | SProp, _ | _, SProp
-    | Prop, Set | Set, Prop -> true
-    | _ -> false
-
   let vars = Array.init 20 (fun i -> make (Var i))
 
   let var n =
@@ -250,7 +244,7 @@ module LMap = struct
       ext empty
 
   let pr f m =
-    h 0 (prlist_with_sep fnl (fun (u, v) ->
+    h (prlist_with_sep fnl (fun (u, v) ->
       Level.pr u ++ f v) (bindings m))
 end
 
@@ -568,16 +562,6 @@ let constraint_type_ord c1 c2 = match c1, c2 with
 | Eq, Eq -> 0
 | Eq, _ -> 1
 
-(* Universe inconsistency: error raised when trying to enforce a relation
-   that would create a cycle in the graph of universes. *)
-
-type univ_inconsistency = constraint_type * universe * universe * explanation Lazy.t option
-
-exception UniverseInconsistency of univ_inconsistency
-
-let error_inconsistency o u v p =
-  raise (UniverseInconsistency (o,Universe.make u,Universe.make v,p))
-
 (* Constraints and sets of constraints. *)
 
 type univ_constraint = Level.t * constraint_type * Level.t
@@ -660,8 +644,6 @@ type 'a constraint_function = 'a -> 'a -> constraints -> constraints
 let enforce_eq_level u v c =
   (* We discard trivial constraints like u=u *)
   if Level.equal u v then c
-  else if Level.apart u v then
-    error_inconsistency Eq u v None
   else Constraint.add (u,Eq,v) c
 
 let enforce_eq u v c =
@@ -684,9 +666,9 @@ let constraint_add_leq v u c =
     let j = m - n in
       if j = -1 (* n = m+1, v+1 <= u <-> v < u *) then
         Constraint.add (x,Lt,y) c
-      else if j <= -1 (* n = m+k, v+k <= u <-> v+(k-1) < u *) then
-        if Level.equal x y then (* u+(k+1) <= u *)
-          raise (UniverseInconsistency (Le, Universe.tip v, Universe.tip u, None))
+      else if j <= -1 (* n = m+k, v+k <= u and k>0 *) then
+        if Level.equal x y then (* u+k <= u with k>0 *)
+          Constraint.add (x,Lt,x) c
         else anomaly (Pp.str"Unable to handle arbitrary u+k <= v constraints.")
       else if j = 0 then
         Constraint.add (x,Le,y) c
@@ -703,8 +685,8 @@ let check_univ_leq u v =
 let enforce_leq u v c =
   match Universe.is_sprop u, Universe.is_sprop v with
   | true, true -> c
-  | true, false | false, true ->
-    raise (UniverseInconsistency (Le, u, v, None))
+  | true, false -> Constraint.add (Level.sprop,Le,Level.prop) c
+  | false, true -> Constraint.add (Level.prop,Le,Level.sprop) c
   | false, false ->
     List.fold_left (fun c v -> (List.fold_left (fun c u -> constraint_add_leq u v c) c u)) c v
 
@@ -961,7 +943,7 @@ struct
 
   let pr prl ?variance (univs, cst as ctx) =
     if is_empty ctx then mt() else
-      h 0 (Instance.pr prl ?variance univs ++ str " |= ") ++ h 0 (v 0 (Constraint.pr prl cst))
+      h (Instance.pr prl ?variance univs ++ str " |= ") ++ h (v 0 (Constraint.pr prl cst))
 
   let hcons (univs, cst) =
     (Instance.hcons univs, hcons_constraints cst)
@@ -1076,7 +1058,7 @@ struct
 
   let pr prl (univs, cst as ctx) =
     if is_empty ctx then mt() else
-      h 0 (LSet.pr prl univs ++ str " |= ") ++ h 0 (v 0 (Constraint.pr prl cst))
+      h (LSet.pr prl univs ++ str " |= ") ++ h (v 0 (Constraint.pr prl cst))
 
   let constraints (_univs, cst) = cst
   let levels (univs, _cst) = univs
@@ -1231,6 +1213,14 @@ let hcons_universe_context_set (v, c) =
   (hcons_universe_set v, hcons_constraints c)
 
 let hcons_univ x = Universe.hcons x
+
+(* Universe inconsistency: error raised when trying to enforce a relation
+   that would create a cycle in the graph of universes. *)
+
+type univ_inconsistency = constraint_type * universe * universe * explanation Lazy.t option
+
+(* Do not use in this file as we may be type-in-type *)
+exception UniverseInconsistency of univ_inconsistency
 
 let explain_universe_inconsistency prl (o,u,v,p : univ_inconsistency) =
   let pr_uni = Universe.pr_with prl in

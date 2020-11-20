@@ -1,8 +1,8 @@
 .. _history:
 
---------------------
+----------------------
 Early history of Coq
---------------------
+----------------------
 
 Historical roots
 ----------------
@@ -17,7 +17,7 @@ verified mathematical proofs, and the *program extractor* which
 synthesizes computer programs obeying their formal specifications,
 written as logical assertions in the language.
 
-The logical language used by |Coq| is a variety of type theory, called the
+The logical language used by Coq is a variety of type theory, called the
 *Calculus of Inductive Constructions*. Without going back to Leibniz and
 Boole, we can date the creation of what is now called mathematical logic
 to the work of Frege and Peano at the turn of the century. The discovery
@@ -108,7 +108,7 @@ modules, automatically generated from a consistency proof of their
 formal specifications. We are however still far from being able to use
 this methodology in a smooth interaction with the standard tools from
 software engineering, i.e. compilers, linkers, run-time systems taking
-advantage of special hardware, debuggers, and the like. We hope that |Coq|
+advantage of special hardware, debuggers, and the like. We hope that Coq
 can be of use to researchers interested in experimenting with this new
 methodology.
 
@@ -154,7 +154,7 @@ manipulation of windows, menus, mouse-sensitive buttons, and other
 widgets. This system (Version 5.6) was released in 1991.
 
 Coq was ported to the new implementation Caml-light of X. Leroy and D.
-Doligez by D. de Rauglaudre (Version 5.7) in 1992. A new version of |Coq|
+Doligez by D. de Rauglaudre (Version 5.7) in 1992. A new version of Coq
 was then coordinated by C. Murthy, with new tools designed by C. Parent
 to prove properties of ML programs (this methodology is dual to program
 extraction) and a new user-interaction loop. This system (Version 5.8)
@@ -163,9 +163,9 @@ by Y. Bertot from the Croap project from INRIA-Sophia-Antipolis.
 
 In parallel, G. Dowek and H. Herbelin developed a new proof engine,
 allowing the general manipulation of existential variables consistently
-with dependent types in an experimental version of |Coq| (V5.9).
+with dependent types in an experimental version of Coq (V5.9).
 
-The version V5.10 of |Coq| is based on a generic system for manipulating
+The version V5.10 of Coq is based on a generic system for manipulating
 terms with binding operators due to Chet Murthy. A new proof engine
 allows the parallel development of partial proofs for independent
 subgoals. The structure of these proof trees is a mixed representation
@@ -519,14 +519,14 @@ Versions 6
 Version 6.1
 ~~~~~~~~~~~
 
-The present version 6.1 of |Coq| is based on the V5.10 architecture. It
+The present version 6.1 of Coq is based on the V5.10 architecture. It
 was ported to the new language Objective Caml by Bruno Barras. The
 underlying framework has slightly changed and allows more conversions
 between sorts.
 
 The new version provides powerful tools for easier developments.
 
-Cristina Cornes designed an extension of the |Coq| syntax to allow
+Cristina Cornes designed an extension of the Coq syntax to allow
 definition of terms using a powerful pattern matching analysis in the
 style of ML programs.
 
@@ -539,13 +539,13 @@ written.
 Yann Coscoy designed a command which explains a proof term using natural
 language. Pierre Crégut built a new tactic which solves problems in
 quantifier-free Presburger Arithmetic. Both functionalities have been
-integrated to the |Coq| system by Hugo Herbelin.
+integrated to the Coq system by Hugo Herbelin.
 
 Samuel Boutin designed a tactic for simplification of commutative rings
 using a canonical set of rewriting rules and equality modulo
 associativity and commutativity.
 
-Finally the organisation of the |Coq| distribution has been supervised by
+Finally the organisation of the Coq distribution has been supervised by
 Jean-Christophe Filliâtre with the help of Judicaël Courant and Bruno
 Barras.
 
@@ -556,21 +556,21 @@ Barras.
 Version 6.2
 ~~~~~~~~~~~
 
-In version 6.2 of |Coq|, the parsing is done using camlp4, a preprocessor
+In version 6.2 of Coq, the parsing is done using camlp4, a preprocessor
 and pretty-printer for CAML designed by Daniel de Rauglaudre at INRIA.
-Daniel de Rauglaudre made the first adaptation of |Coq| for camlp4, this
-work was continued by Bruno Barras who also changed the structure of |Coq|
+Daniel de Rauglaudre made the first adaptation of Coq for camlp4, this
+work was continued by Bruno Barras who also changed the structure of Coq
 abstract syntax trees and the primitives to manipulate them. The result
 of these changes is a faster parsing procedure with greatly improved
 syntax-error messages. The user-interface to introduce grammar or
 pretty-printing rules has also changed.
 
 Eduardo Giménez redesigned the internal tactic libraries, giving uniform
-names to Caml functions corresponding to |Coq| tactic names.
+names to Caml functions corresponding to Coq tactic names.
 
 Bruno Barras wrote new, more efficient reduction functions.
 
-Hugo Herbelin introduced more uniform notations in the |Coq| specification
+Hugo Herbelin introduced more uniform notations in the Coq specification
 language: the definitions by fixpoints and pattern matching have a more
 readable syntax. Patrick Loiseleur introduced user-friendly notations
 for arithmetic expressions.
@@ -586,10 +586,10 @@ a proof term with holes as a proof scheme.
 David Delahaye designed the tool to search an object in the library
 given its type (up to isomorphism).
 
-Henri Laulhère produced the |Coq| distribution for the Windows
+Henri Laulhère produced the Coq distribution for the Windows
 environment.
 
-Finally, Hugo Herbelin was the main coordinator of the |Coq| documentation
+Finally, Hugo Herbelin was the main coordinator of the Coq documentation
 with principal contributions by Bruno Barras, David Delahaye,
 Jean-Christophe Filliâtre, Eduardo Giménez, Hugo Herbelin and Patrick
 Loiseleur.
@@ -639,7 +639,7 @@ Summary of changes
 
 The version V7 is a new implementation started in September 1999 by
 Jean-Christophe Filliâtre. This is a major revision with respect to the
-internal architecture of the system. The |Coq| version 7.0 was distributed
+internal architecture of the system. The Coq version 7.0 was distributed
 in March 2001, version 7.1 in September 2001, version 7.2 in January
 2002, version 7.3 in May 2002 and version 7.4 in February 2003.
 
@@ -653,13 +653,13 @@ Hugo Herbelin introduced a new structure of terms with local
 definitions. He introduced “qualified” names, wrote a new
 pattern matching compilation algorithm and designed a more compact
 algorithm for checking the logical consistency of universes. He
-contributed to the simplification of |Coq| internal structures and the
+contributed to the simplification of Coq internal structures and the
 optimisation of the system. He added basic tactics for forward reasoning
 and coercions in patterns.
 
 David Delahaye introduced a new language for tactics. General tactics
 using pattern matching on goals and context can directly be written from
-the |Coq| toplevel. He also provided primitives for the design of
+the Coq toplevel. He also provided primitives for the design of
 user-defined tactics in Caml.
 
 Micaela Mayero contributed the library on real numbers. Olivier
@@ -668,16 +668,16 @@ square, square roots, finite sums, Chasles property and basic plane
 geometry.
 
 Jean-Christophe Filliâtre and Pierre Letouzey redesigned a new
-extraction procedure from |Coq| terms to Caml or Haskell programs. This
+extraction procedure from Coq terms to Caml or Haskell programs. This
 new extraction procedure, unlike the one implemented in previous version
-of |Coq| is able to handle all terms in the Calculus of Inductive
+of Coq is able to handle all terms in the Calculus of Inductive
 Constructions, even involving universes and strong elimination. P.
 Letouzey adapted user contributions to extract ML programs when it was
 sensible. Jean-Christophe Filliâtre wrote ``coqdoc``, a documentation
-tool for |Coq| libraries usable from version 7.2.
+tool for Coq libraries usable from version 7.2.
 
 Bruno Barras improved the efficiency of the reduction algorithm and the
-confidence level in the correctness of |Coq| critical type checking
+confidence level in the correctness of Coq critical type checking
 algorithm.
 
 Yves Bertot designed the ``SearchPattern`` and ``SearchRewrite`` tools
@@ -696,7 +696,7 @@ real numbers.
 Pierre Crégut developed a new, reflection-based version of the Omega
 decision procedure.
 
-Claudio Sacerdoti Coen designed an XML output for the |Coq| modules to be
+Claudio Sacerdoti Coen designed an XML output for the Coq modules to be
 used in the Hypertextual Electronic Library of Mathematics (HELM cf
 http://www.cs.unibo.it/helm).
 
@@ -706,13 +706,13 @@ contributed by Jean Goubault was integrated in the basic theories.
 Pierre Courtieu developed a command and a tactic to reason on the
 inductive structure of recursively defined functions.
 
-Jacek Chrząszcz designed and implemented the module system of |Coq| whose
+Jacek Chrząszcz designed and implemented the module system of Coq whose
 foundations are in Judicaël Courant’s PhD thesis.
 
 The development was coordinated by C. Paulin.
 
 Many discussions within the Démons team and the LogiCal project
-influenced significantly the design of |Coq| especially with J. Courant,
+influenced significantly the design of Coq especially with J. Courant,
 J. Duprat, J. Goubault, A. Miquel, C. Marché, B. Monate and B. Werner.
 
 Intensive users suggested improvements of the system : Y. Bertot, L.
@@ -1171,7 +1171,7 @@ Incompatibilities
 
 - New naming strategy for NewInduction/NewDestruct may affect 7.1 compatibility
 - Extra parentheses may exceptionally be needed in tactic definitions.
-- Coq extensions written in Ocaml need to be updated (see dev/changements.txt
+- Coq extensions written in OCaml need to be updated (see dev/changements.txt
   for a description of the main changes in the interface files of V7.2)
 - New behaviour of Intuition/Tauto may exceptionally lead to incompatibilities
 

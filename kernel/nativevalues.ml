@@ -36,13 +36,13 @@ type annot_sw = {
 
 (* We compare only what is relevant for generation of ml code *)
 let eq_annot_sw asw1 asw2 =
-  eq_ind asw1.asw_ind asw2.asw_ind &&
+  Ind.CanOrd.equal asw1.asw_ind asw2.asw_ind &&
   String.equal asw1.asw_prefix asw2.asw_prefix
 
 open Hashset.Combine
 
 let hash_annot_sw asw =
-  combine (ind_hash asw.asw_ind) (String.hash asw.asw_prefix)
+  combine (Ind.CanOrd.hash asw.asw_ind) (String.hash asw.asw_prefix)
 
 type sort_annot = string * int
 
@@ -737,15 +737,6 @@ let no_check_arraycopy t =
 let arraycopy accu vA t =
   if is_parray t then
     no_check_arraycopy t
-  else accu vA t
-
-let no_check_arrayreroot t =
-  of_parray (Parray.reroot (to_parray t))
-[@@ocaml.inline always]
-
-let arrayreroot accu vA t =
-  if is_parray t then
-    no_check_arrayreroot t
   else accu vA t
 
 let no_check_arraylength t =

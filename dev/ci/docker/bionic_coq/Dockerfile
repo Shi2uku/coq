@@ -1,4 +1,4 @@
-# CACHEKEY: "bionic_coq-V2020-08-28-V92"
+# CACHEKEY: "bionic_coq-V2020-10-12-V89"
 # ^^ Update when modifying this file.
 
 FROM ubuntu:bionic
@@ -40,12 +40,10 @@ ENV NJOBS="2" \
 # Base opam is the set of base packages required by Coq
 ENV COMPILER="4.05.0"
 
-# Common OPAM packages, num to be removed once the migration to
-# micromega is complete, `num` also does not have a version number as
-# the right version to install varies with the compiler version.
-ENV BASE_OPAM="num zarith.1.9.1 ocamlfind.1.8.1 ounit2.2.2.3 odoc.1.5.0" \
+# Common OPAM packages
+ENV BASE_OPAM="zarith.1.10 ocamlfind.1.8.1 ounit2.2.2.3 odoc.1.5.1" \
     CI_OPAM="menhir.20190626 ocamlgraph.1.8.8" \
-    BASE_ONLY_OPAM="elpi.1.11.0"
+    BASE_ONLY_OPAM="elpi.1.11.4"
 
 # BASE switch; CI_OPAM contains Coq's CI dependencies.
 ENV COQIDE_OPAM="cairo2.0.6.1 lablgtk3-sourceview3.3.1.0"
@@ -59,12 +57,12 @@ RUN opam init -a --disable-sandboxing --compiler="$COMPILER" default https://opa
 
 # base+32bit switch, note the zarith hack
 RUN opam switch create "${COMPILER}+32bit" && eval $(opam env) && \
-        i386 env CC='gcc -m32' opam install zarith.1.9.1 && \
+        i386 env CC='gcc -m32' opam install zarith.1.10 && \
         opam install $BASE_OPAM
 
 # EDGE switch
-ENV COMPILER_EDGE="4.10.0" \
-    BASE_OPAM_EDGE="dune.2.5.1 dune-release.1.3.3 ocamlformat.0.14.2"
+ENV COMPILER_EDGE="4.11.1" \
+    BASE_OPAM_EDGE="dune.2.5.1 dune-release.1.3.3 ocamlformat.0.15.0"
 
 # EDGE+flambda switch, we install CI_OPAM as to be able to use
 # `ci-template-flambda` with everything.

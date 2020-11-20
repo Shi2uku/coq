@@ -44,13 +44,13 @@ let names_of_local_binders bl =
 (**********************************************************************)
 (* Functions on constr_expr *)
 
-(* Note: redundant Numeral representations, such as -0 and +0 (and others),
+(* Note: redundant Number representations, such as -0 and +0 (and others),
    are considered different here. *)
 
 let prim_token_eq t1 t2 = match t1, t2 with
-| Numeral n1, Numeral n2 -> NumTok.Signed.equal n1 n2
+| Number n1, Number n2 -> NumTok.Signed.equal n1 n2
 | String s1, String s2 -> String.equal s1 s2
-| (Numeral _ | String _), _ -> false
+| (Number _ | String _), _ -> false
 
 let explicitation_eq ex1 ex2 = match ex1, ex2 with
 | ExplByPos (i1, id1), ExplByPos (i2, id2) ->
@@ -156,7 +156,7 @@ let rec constr_expr_eq e1 e2 =
     | CPatVar i1, CPatVar i2 ->
       Id.equal i1 i2
     | CEvar (id1, c1), CEvar (id2, c2) ->
-      Id.equal id1 id2 && List.equal instance_eq c1 c2
+      Id.equal id1.CAst.v id2.CAst.v && List.equal instance_eq c1 c2
     | CSort s1, CSort s2 ->
       Glob_ops.glob_sort_eq s1 s2
     | CCast(t1,c1), CCast(t2,c2) ->
@@ -235,7 +235,7 @@ and constr_notation_substitution_eq (e1, el1, b1, bl1) (e2, el2, b2, bl2) =
   List.equal (List.equal local_binder_eq) bl1 bl2
 
 and instance_eq (x1,c1) (x2,c2) =
-  Id.equal x1 x2 && constr_expr_eq c1 c2
+  Id.equal x1.CAst.v x2.CAst.v && constr_expr_eq c1 c2
 
 and cast_expr_eq c1 c2 = match c1, c2 with
 | CastConv t1, CastConv t2
@@ -614,37 +614,3 @@ let rec coerce_to_cases_pattern_expr c = CAst.map_with_loc (fun ?loc -> function
   | _ ->
      CErrors.user_err ?loc ~hdr:"coerce_to_cases_pattern_expr"
                       (str "This expression should be coercible to a pattern.")) c
-
-(** Local universe and constraint declarations. *)
-
-let interp_univ_constraints env evd cstrs =
-  let interp (evd,cstrs) (u, d, u') =
-    let ul = Pretyping.interp_known_glob_level evd u in
-    let u'l = Pretyping.interp_known_glob_level evd u' in
-    let cstr = (ul,d,u'l) in
-    let cstrs' = Univ.Constraint.add cstr cstrs in
-    try let evd = Evd.add_constraints evd (Univ.Constraint.singleton cstr) in
-        evd, cstrs'
-    with Univ.UniverseInconsistency e as exn ->
-      let _, info = Exninfo.capture exn in
-      CErrors.user_err ~hdr:"interp_constraint" ~info
-        (Univ.explain_universe_inconsistency (Termops.pr_evd_level evd) e)
-  in
-  List.fold_left interp (evd,Univ.Constraint.empty) cstrs
-
-let interp_univ_decl env decl =
-  let open UState in
-  let pl : lident list = decl.univdecl_instance in
-  let evd = Evd.from_ctx (UState.make_with_initial_binders ~lbound:(Environ.universes_lbound env)
-                            (Environ.universes env) pl) in
-  let evd, cstrs = interp_univ_constraints env evd decl.univdecl_constraints in
-  let decl = { univdecl_instance = pl;
-    univdecl_extensible_instance = decl.univdecl_extensible_instance;
-    univdecl_constraints = cstrs;
-    univdecl_extensible_constraints = decl.univdecl_extensible_constraints }
-  in evd, decl
-
-let interp_univ_decl_opt env l =
-  match l with
-  | None -> Evd.from_env env, UState.default_univ_decl
-  | Some decl -> interp_univ_decl env decl

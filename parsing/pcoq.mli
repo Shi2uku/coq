@@ -123,23 +123,28 @@ val parse_string : 'a Entry.t -> ?loc:Loc.t -> string -> 'a
 val eoi_entry : 'a Entry.t -> 'a Entry.t
 val map_entry : ('a -> 'b) -> 'a Entry.t -> 'b Entry.t
 
-type gram_universe
+type gram_universe [@@deprecated "Deprecated in 8.13"]
+[@@@ocaml.warning "-3"]
+val get_univ : string -> gram_universe [@@deprecated "Deprecated in 8.13"]
+val create_universe : string -> gram_universe [@@deprecated "Deprecated in 8.13"]
 
-val get_univ : string -> gram_universe
-val create_universe : string -> gram_universe
+val new_entry : gram_universe -> string -> 'a Entry.t [@@deprecated "Deprecated in 8.13"]
 
-val new_entry : gram_universe -> string -> 'a Entry.t
+val uprim : gram_universe [@@deprecated "Deprecated in 8.13"]
+val uconstr : gram_universe [@@deprecated "Deprecated in 8.13"]
+val utactic : gram_universe [@@deprecated "Deprecated in 8.13"]
 
-val uprim : gram_universe
-val uconstr : gram_universe
-val utactic : gram_universe
+val create_generic_entry : gram_universe -> string ->
+  ('a, rlevel) abstract_argument_type -> 'a Entry.t
+  [@@deprecated "Deprecated in 8.13.  Use create_generic_entry2 instead."]
+[@@@ocaml.warning "+3"]
+
+val create_generic_entry2 : string ->
+  ('a, rlevel) abstract_argument_type -> 'a Entry.t
 
 
 val register_grammar : ('raw, 'glb, 'top) genarg_type -> 'raw Entry.t -> unit
 val genarg_grammar : ('raw, 'glb, 'top) genarg_type -> 'raw Entry.t
-
-val create_generic_entry : gram_universe -> string ->
-  ('a, rlevel) abstract_argument_type -> 'a Entry.t
 
 module Prim :
   sig
@@ -151,8 +156,8 @@ module Prim :
     val identref : lident Entry.t
     val univ_decl : universe_decl_expr Entry.t
     val ident_decl : ident_decl Entry.t
-    val pattern_ident : Id.t Entry.t
-    val pattern_identref : lident Entry.t
+    val pattern_ident : lident Entry.t
+    val pattern_identref : lident Entry.t [@@ocaml.deprecated "Use Prim.pattern_identref"]
     val base_ident : Id.t Entry.t
     val bignat : string Entry.t
     val natural : int Entry.t
@@ -168,7 +173,8 @@ module Prim :
     val dirpath : DirPath.t Entry.t
     val ne_string : string Entry.t
     val ne_lstring : lstring Entry.t
-    val var : lident Entry.t
+    val hyp : lident Entry.t
+    val var : lident Entry.t [@@ocaml.deprecated "Use Prim.hyp"]
     val bar_cbrace : unit Entry.t
     val strategy_level : Conv_oracle.level Entry.t
   end
@@ -179,7 +185,9 @@ module Constr :
     val constr_eoi : constr_expr Entry.t
     val lconstr : constr_expr Entry.t
     val binder_constr : constr_expr Entry.t
+    val term : constr_expr Entry.t
     val operconstr : constr_expr Entry.t
+      [@@deprecated "Deprecated in 8.13; use 'term' instead"]
     val ident : Id.t Entry.t
     val global : qualid Entry.t
     val universe_name : Glob_term.glob_sort_name Entry.t
@@ -188,7 +196,9 @@ module Constr :
     val sort_family : Sorts.family Entry.t
     val pattern : cases_pattern_expr Entry.t
     val constr_pattern : constr_expr Entry.t
+    val cpattern : constr_expr Entry.t
     val lconstr_pattern : constr_expr Entry.t
+      [@@deprecated "Deprecated in 8.13; use 'cpattern' instead"]
     val closed_binder : local_binder_expr list Entry.t
     val binder : local_binder_expr list Entry.t (* closed_binder or variable *)
     val binders : local_binder_expr list Entry.t (* list of binder *)
@@ -196,7 +206,9 @@ module Constr :
     val binders_fixannot : (local_binder_expr list * recursion_order_expr option) Entry.t
     val typeclass_constraint : (lname * bool * constr_expr) Entry.t
     val record_declaration : constr_expr Entry.t
+    val arg : (constr_expr * explicitation CAst.t option) Entry.t
     val appl_arg : (constr_expr * explicitation CAst.t option) Entry.t
+      [@@deprecated "Deprecated in 8.13; use 'arg' instead"]
     val type_cstr : constr_expr Entry.t
   end
 

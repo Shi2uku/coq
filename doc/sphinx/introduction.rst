@@ -1,4 +1,4 @@
-This is the reference manual of |Coq|.  Coq is an interactive theorem
+This is the reference manual of Coq.  Coq is an interactive theorem
 prover.  It lets you formalize mathematical concepts and then helps
 you interactively generate machine-checked proofs of theorems.
 Machine checking gives users much more confidence that the proofs are

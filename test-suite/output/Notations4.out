@@ -1,6 +1,6 @@
 [< 0 > + < 1 > * < 2 >]
      : nat
-Entry constr:myconstr is
+Entry custom:myconstr is
 [ "6" RIGHTA
   [  ]
 | "5" RIGHTA
@@ -8,7 +8,7 @@ Entry constr:myconstr is
 | "4" RIGHTA
   [ SELF; "*"; NEXT ]
 | "3" RIGHTA
-  [ "<"; constr:operconstr LEVEL "10"; ">" ] ]
+  [ "<"; term LEVEL "10"; ">" ] ]
 
 [< b > + < b > * < 2 >]
      : nat
@@ -75,9 +75,9 @@ The command has indeed failed with message:
 The format is not the same on the right- and left-hand sides of the special token "..".
 The command has indeed failed with message:
 The format is not the same on the right- and left-hand sides of the special token "..".
-Entry constr:expr is
+Entry custom:expr is
 [ "201" RIGHTA
-  [ "{"; constr:operconstr LEVEL "200"; "}" ] ]
+  [ "{"; term LEVEL "200"; "}" ] ]
 
 fun x : nat => [ x ]
      : nat -> nat
@@ -125,3 +125,75 @@ Warning: Notation "_ :=: _" was already used. [notation-overridden,parsing]
      : Prop
 fun x : nat => <{ x; (S x) }>
      : nat -> nat
+exists p : nat, ▢_p (p >= 1)
+     : Prop
+▢_n (n >= 1)
+     : Prop
+The command has indeed failed with message:
+Found an inductive type while a variable name was expected.
+The command has indeed failed with message:
+Found a constructor while a variable name was expected.
+The command has indeed failed with message:
+Found a constant while a variable name was expected.
+exists x y : nat, ▢_(x, y) (x >= 1 /\ y >= 2)
+     : Prop
+▢_n (n >= 1)
+     : Prop
+The command has indeed failed with message:
+Found an inductive type while a pattern was expected.
+▢_tt (tt = tt)
+     : Prop
+The command has indeed failed with message:
+Found a constant while a pattern was expected.
+exists x y : nat, ▢_(x, y) (x >= 1 /\ y >= 2)
+     : Prop
+pseudo_force n (fun n : nat => n >= 1)
+     : Prop
+The command has indeed failed with message:
+Found an inductive type while a pattern was expected.
+▢_tt (tt = tt)
+     : Prop
+The command has indeed failed with message:
+Found a constant while a pattern was expected.
+exists x y : nat, myforce (x, y) (x >= 1 /\ y >= 2)
+     : Prop
+myforce n (n >= 1)
+     : Prop
+The command has indeed failed with message:
+Found an inductive type while a pattern was expected.
+myforce tt (tt = tt)
+     : Prop
+The command has indeed failed with message:
+Found a constant while a pattern was expected.
+id nat
+     : Set
+fun a : bool => id a
+     : bool -> bool
+fun nat : bool => id nat
+     : bool -> bool
+The command has indeed failed with message:
+Found an inductive type while a pattern was expected.
+!! nat, nat = true
+     : Prop
+!!! nat, nat = true
+     : Prop
+!!!! (nat, id), nat = true /\ id = false
+     : Prop
+∀ x : nat, x = 0
+     : Prop
+∀₁ x, x = 0
+     : Prop
+∀₁ x, x = 0
+     : Prop
+∀₂ x y, x + y = 0
+     : Prop
+((1, 2))
+     : nat * nat
+%% [x == 1]
+     : Prop
+%%% [1]
+     : Prop
+[[2]]
+     : nat * nat
+%%%
+     : Type

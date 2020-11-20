@@ -110,7 +110,7 @@ let interp_fix_context ~program_mode ~cofix env sigma fix =
     else [], fix.Vernacexpr.binders in
   let sigma, (impl_env, ((env', ctx), imps)) = interp_context_evars ~program_mode env sigma before in
   let sigma, (impl_env', ((env'', ctx'), imps')) =
-    interp_context_evars ~program_mode ~impl_env ~shift:(Context.Rel.nhyps ctx) env' sigma after
+    interp_context_evars ~program_mode ~impl_env env' sigma after
   in
   let annot = Option.map (fun _ -> List.length (Termops.assums_of_rel_context ctx)) fix.Vernacexpr.rec_order in
   sigma, ((env'', ctx' @ ctx), (impl_env',imps @ imps'), annot)
@@ -176,7 +176,7 @@ let interp_recursive ~program_mode ~cofix (fixl : 'a Vernacexpr.fix_expr_gen lis
            if not (CList.for_all2eq (fun x y -> Id.equal x.CAst.v y.CAst.v) lsu usu) then
              CErrors.user_err Pp.(str "(co)-recursive definitions should all have the same universe binders");
            Some us) fixl None in
-  let sigma, decl = Constrexpr_ops.interp_univ_decl_opt env all_universes in
+  let sigma, decl = interp_univ_decl_opt env all_universes in
   let sigma, (fixctxs, fiximppairs, fixannots) =
     on_snd List.split3 @@
       List.fold_left_map (fun sigma -> interp_fix_context ~program_mode env sigma ~cofix) sigma fixl in
@@ -247,18 +247,26 @@ let interp_fixpoint ?(check_recursivity=true) ~cofix l :
     (EConstr.rel_context * Impargs.manual_implicits * int option) list) =
   let (env,_,pl,evd),fix,info = interp_recursive ~program_mode:false ~cofix l in
   if check_recursivity then check_recursive true env evd fix;
+  let evd = Pretyping.(solve_remaining_evars all_no_fail_flags env evd) in
   let uctx,fix = ground_fixpoint env evd fix in
   (fix,pl,uctx,info)
 
-let build_recthms ~indexes fixnames fixtypes fiximps =
+let build_recthms ~indexes ?using fixnames fixtypes fiximps =
   let fix_kind, cofix = match indexes with
     | Some indexes -> Decls.Fixpoint, false
     | None -> Decls.CoFixpoint, true
   in
   let thms =
     List.map3 (fun name typ (ctx,impargs,_) ->
+        let using = using |> Option.map (fun expr ->
+          let terms = [EConstr.of_constr typ] in
+          let env = Global.env() in
+          let sigma = Evd.from_env env in
+          let l = Proof_using.process_expr env sigma expr terms in
+          Names.Id.Set.(List.fold_right add l empty))
+        in
         let args = List.map Context.Rel.Declaration.get_name ctx in
-        Declare.CInfo.make ~name ~typ ~args ~impargs ()
+        Declare.CInfo.make ~name ~typ ~args ~impargs ?using ()
       ) fixnames fixtypes fiximps
   in
   fix_kind, cofix, thms
@@ -276,9 +284,9 @@ let declare_fixpoint_interactive_generic ?indexes ~scope ~poly ((fixnames,_fixrs
   List.iter (Metasyntax.add_notation_interpretation (Global.env())) ntns;
   lemma
 
-let declare_fixpoint_generic ?indexes ~scope ~poly ((fixnames,fixrs,fixdefs,fixtypes),udecl,uctx,fiximps) ntns =
+let declare_fixpoint_generic ?indexes ~scope ~poly ?using ((fixnames,fixrs,fixdefs,fixtypes),udecl,uctx,fiximps) ntns =
   (* We shortcut the proof process *)
-  let fix_kind, cofix, fixitems = build_recthms ~indexes fixnames fixtypes fiximps in
+  let fix_kind, cofix, fixitems = build_recthms ~indexes ?using fixnames fixtypes fiximps in
   let fixdefs = List.map Option.get fixdefs in
   let rec_declaration = prepare_recursive_declaration fixnames fixrs fixtypes fixdefs in
   let fix_kind = Decls.IsDefinition fix_kind in
@@ -327,9 +335,9 @@ let do_fixpoint_interactive ~scope ~poly l : Declare.Proof.t =
   let lemma = declare_fixpoint_interactive_generic ~indexes:possible_indexes ~scope ~poly fix ntns in
   lemma
 
-let do_fixpoint ~scope ~poly l =
+let do_fixpoint ~scope ~poly ?using l =
   let fixl, ntns, fix, possible_indexes = do_fixpoint_common l in
-  declare_fixpoint_generic ~indexes:possible_indexes ~scope ~poly fix ntns
+  declare_fixpoint_generic ~indexes:possible_indexes ~scope ~poly ?using fix ntns
 
 let do_cofixpoint_common (fixl : Vernacexpr.cofixpoint_expr list) =
   let fixl = List.map (fun fix -> {fix with Vernacexpr.rec_order = None}) fixl in
@@ -341,6 +349,6 @@ let do_cofixpoint_interactive ~scope ~poly l =
   let lemma = declare_fixpoint_interactive_generic ~scope ~poly cofix ntns in
   lemma
 
-let do_cofixpoint ~scope ~poly l =
+let do_cofixpoint ~scope ~poly ?using l =
   let cofix, ntns = do_cofixpoint_common l in
-  declare_fixpoint_generic ~scope ~poly cofix ntns
+  declare_fixpoint_generic ~scope ~poly ?using cofix ntns

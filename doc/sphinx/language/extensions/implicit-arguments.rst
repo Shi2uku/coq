@@ -146,7 +146,7 @@ by replacing it with `_`.
 .. exn:: Cannot infer a term for this placeholder.
    :name: Cannot infer a term for this placeholder. (Casual use of implicit arguments)
 
-   |Coq| was not able to deduce an instantiation of a “_”.
+   Coq was not able to deduce an instantiation of a “_”.
 
 .. _declare-implicit-args:
 
@@ -217,7 +217,7 @@ usual implicit arguments disambiguation syntax.
 
 The syntax is also supported in internal binders. For instance, in the
 following kinds of expressions, the type of each declaration present
-in :token:`binders` can be bracketed to mark the declaration as
+in :n:`{* @binder }` can be bracketed to mark the declaration as
 implicit:
 * :n:`fun (@ident:forall {* @binder }, @type) => @term`,
 * :n:`forall (@ident:forall {* @binder }, @type), @type`,
@@ -290,8 +290,8 @@ Controlling contextual implicit arguments
 
 .. flag:: Contextual Implicit
 
-   By default, |Coq| does not automatically set implicit the contextual
-   implicit arguments. You can turn this flag on to tell |Coq| to also
+   By default, Coq does not automatically set implicit the contextual
+   implicit arguments. You can turn this flag on to tell Coq to also
    infer contextual implicit argument.
 
 .. _controlling-rev-pattern-implicit-args:
@@ -301,8 +301,8 @@ Controlling reversible-pattern implicit arguments
 
 .. flag:: Reversible Pattern Implicit
 
-   By default, |Coq| does not automatically set implicit the reversible-pattern
-   implicit arguments. You can turn this flag on to tell |Coq| to also infer
+   By default, Coq does not automatically set implicit the reversible-pattern
+   implicit arguments. You can turn this flag on to tell Coq to also infer
    reversible-pattern implicit argument.
 
 .. _controlling-insertion-implicit-args:

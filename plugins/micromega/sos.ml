@@ -80,7 +80,7 @@ let is_zero (d, v) = match v with Empty -> true | _ -> false
 (* Vectors. Conventionally indexed 1..n.                                     *)
 (* ------------------------------------------------------------------------- *)
 
-let vector_0 n = ((n, undefined) : vector)
+let vector_0 n : vector = (n, undefined)
 let dim (v : vector) = fst v
 
 let vector_const c n =
@@ -99,7 +99,7 @@ let vector_of_list l =
 (* Matrices; again rows and columns indexed from 1.                          *)
 (* ------------------------------------------------------------------------- *)
 
-let matrix_0 (m, n) = (((m, n), undefined) : matrix)
+let matrix_0 (m, n) : matrix = ((m, n), undefined)
 let dimensions (m : matrix) = fst m
 
 let matrix_cmul c (m : matrix) =
@@ -107,7 +107,7 @@ let matrix_cmul c (m : matrix) =
   if c =/ Q.zero then matrix_0 (i, j)
   else ((i, j), mapf (fun x -> c */ x) (snd m))
 
-let matrix_neg (m : matrix) = ((dimensions m, mapf Q.neg (snd m)) : matrix)
+let matrix_neg (m : matrix) : matrix = (dimensions m, mapf Q.neg (snd m))
 
 let matrix_add (m1 : matrix) (m2 : matrix) =
   let d1 = dimensions m1 and d2 = dimensions m2 in
@@ -138,7 +138,7 @@ let diagonal (v : vector) =
 (* Monomials.                                                                *)
 (* ------------------------------------------------------------------------- *)
 let monomial_1 = (undefined : monomial)
-let monomial_var x = (x |=> 1 : monomial)
+let monomial_var x : monomial = x |=> 1
 
 let (monomial_mul : monomial -> monomial -> monomial) =
   combine ( + ) (fun x -> false)
@@ -152,16 +152,16 @@ let monomial_variables m = dom m
 (* ------------------------------------------------------------------------- *)
 let poly_0 = (undefined : poly)
 let poly_isconst (p : poly) = foldl (fun a m c -> m = monomial_1 && a) true p
-let poly_var x = (monomial_var x |=> Q.one : poly)
+let poly_var x : poly = monomial_var x |=> Q.one
 let poly_const c = if c =/ Q.zero then poly_0 else monomial_1 |=> c
 
 let poly_cmul c (p : poly) =
   if c =/ Q.zero then poly_0 else mapf (fun x -> c */ x) p
 
-let poly_neg (p : poly) = (mapf Q.neg p : poly)
+let poly_neg (p : poly) : poly = mapf Q.neg p
 
-let poly_add (p1 : poly) (p2 : poly) =
-  (combine ( +/ ) (fun x -> x =/ Q.zero) p1 p2 : poly)
+let poly_add (p1 : poly) (p2 : poly) : poly =
+  combine ( +/ ) (fun x -> x =/ Q.zero) p1 p2
 
 let poly_sub p1 p2 = poly_add p1 (poly_neg p2)
 
@@ -576,7 +576,7 @@ let eliminate_all_equations one =
       else
         let v = choose_variable eq in
         let a = apply eq v in
-        let eq' = equation_cmul (Q.neg_one // a) (undefine v eq) in
+        let eq' = equation_cmul (Q.minus_one // a) (undefine v eq) in
         let elim e =
           let b = tryapplyd e v Q.zero in
           if b =/ Q.zero then e
@@ -814,7 +814,7 @@ let bmatrix_add = combine ( +/ ) (fun x -> x =/ Q.zero)
 let bmatrix_cmul c bm =
   if c =/ Q.zero then undefined else mapf (fun x -> c */ x) bm
 
-let bmatrix_neg = bmatrix_cmul Q.neg_one
+let bmatrix_neg = bmatrix_cmul Q.minus_one
 
 (* ------------------------------------------------------------------------- *)
 (* Smash a block matrix into components.                                     *)
@@ -943,7 +943,7 @@ let real_positivnullstellensatz_general linf d eqs leqs pol =
     List.fold_right
       (fun k -> List.nth pvs (k - 1) |-> element vec k)
       (1 -- dim vec)
-      ((0, 0, 0) |=> Q.neg_one)
+      ((0, 0, 0) |=> Q.minus_one)
   in
   let finalassigs =
     foldl (fun a v e -> (v |-> equation_eval newassigs e) a) newassigs allassig
@@ -1166,7 +1166,7 @@ let sumofsquares_general_symmetry tool pol =
       match cls with
       | [] -> raise Sanity
       | [h] -> acc
-      | h :: t -> List.map (fun k -> (k |-> Q.neg_one) (h |=> Q.one)) t @ acc
+      | h :: t -> List.map (fun k -> (k |-> Q.minus_one) (h |=> Q.one)) t @ acc
     in
     List.fold_right mk_eq eqvcls []
   in
@@ -1191,14 +1191,13 @@ let sumofsquares_general_symmetry tool pol =
   let diagents =
     end_itlist equation_add (List.map (fun i -> apply allassig (i, i)) (1 -- n))
   in
-  let mk_matrix v =
-    ( ( (n, n)
-      , foldl
-          (fun m (i, j) ass ->
-            let c = tryapplyd ass v Q.zero in
-            if c =/ Q.zero then m else ((j, i) |-> c) (((i, j) |-> c) m))
-          undefined allassig )
-      : matrix )
+  let mk_matrix v : matrix =
+    ( (n, n)
+    , foldl
+        (fun m (i, j) ass ->
+          let c = tryapplyd ass v Q.zero in
+          if c =/ Q.zero then m else ((j, i) |-> c) (((i, j) |-> c) m))
+        undefined allassig )
   in
   let mats = List.map mk_matrix qvars
   and obj =

@@ -100,7 +100,7 @@ ARGUMENT EXTEND ssrtacarg TYPED AS tactic PRINTED BY { pr_ssrtacarg env sigma }
 END
 GRAMMAR EXTEND Gram
   GLOBAL: ssrtacarg;
-  ssrtacarg: [[ tac = tactic_expr LEVEL "5" -> { tac } ]];
+  ssrtacarg: [[ tac = ltac_expr LEVEL "5" -> { tac } ]];
 END
 
 (* Copy of ssrtacarg with LEVEL "3", useful for: "under ... do ..." *)
@@ -108,7 +108,7 @@ ARGUMENT EXTEND ssrtac3arg TYPED AS tactic PRINTED BY { pr_ssrtacarg env sigma }
 END
 GRAMMAR EXTEND Gram
   GLOBAL: ssrtac3arg;
-  ssrtac3arg: [[ tac = tactic_expr LEVEL "3" -> { tac } ]];
+  ssrtac3arg: [[ tac = ltac_expr LEVEL "3" -> { tac } ]];
 END
 
 {
@@ -155,7 +155,7 @@ let pr_ssrhyp _ _ _ = pr_hyp
 let wit_ssrhyprep = add_genarg "ssrhyprep" (fun env sigma -> pr_hyp)
 
 let intern_hyp ist (SsrHyp (loc, id) as hyp) =
-  let _ = Tacintern.intern_genarg ist (in_gen (rawwit wit_var) CAst.(make ?loc id)) in
+  let _ = Tacintern.intern_genarg ist (in_gen (rawwit wit_hyp) CAst.(make ?loc id)) in
   if not_section_id id then hyp else
   hyp_err ?loc "Can't clear section hypothesis " id
 
@@ -219,20 +219,20 @@ let test_ssrslashnum b1 b2 _ strm =
   match Util.stream_nth 0 strm with
   | Tok.KEYWORD "/" ->
       (match Util.stream_nth 1 strm with
-      | Tok.NUMERAL _ when b1 ->
+      | Tok.NUMBER _ when b1 ->
          (match Util.stream_nth 2 strm with
          | Tok.KEYWORD "=" | Tok.KEYWORD "/=" when not b2 -> ()
          | Tok.KEYWORD "/" ->
              if not b2 then () else begin
                match Util.stream_nth 3 strm with
-               | Tok.NUMERAL _ -> ()
+               | Tok.NUMBER _ -> ()
                | _ -> raise Stream.Failure
              end
          | _ -> raise Stream.Failure)
       | Tok.KEYWORD "/" when not b1 ->
          (match Util.stream_nth 2 strm with
          | Tok.KEYWORD "=" when not b2 -> ()
-         | Tok.NUMERAL _ when b2 ->
+         | Tok.NUMBER _ when b2 ->
            (match Util.stream_nth 3 strm with
            | Tok.KEYWORD "=" -> ()
            | _ -> raise Stream.Failure)
@@ -243,7 +243,7 @@ let test_ssrslashnum b1 b2 _ strm =
   | Tok.KEYWORD "//" when not b1 ->
          (match Util.stream_nth 1 strm with
          | Tok.KEYWORD "=" when not b2 -> ()
-         | Tok.NUMERAL _ when b2 ->
+         | Tok.NUMBER _ when b2 ->
            (match Util.stream_nth 2 strm with
            | Tok.KEYWORD "=" -> ()
            | _ -> raise Stream.Failure)
@@ -350,7 +350,7 @@ let interp_index ist gl idx =
         | Some c ->
           let rc = Detyping.detype Detyping.Now false Id.Set.empty (pf_env gl) (project gl) c in
           begin match Notation.uninterp_prim_token rc (None, []) with
-          | Constrexpr.Numeral n, _ when NumTok.Signed.is_int n ->
+          | Constrexpr.Number n, _ when NumTok.Signed.is_int n ->
             int_of_string (NumTok.Signed.to_string n)
           | _ -> raise Not_found
           end
@@ -403,7 +403,7 @@ END
 let pr_mmod = function May -> str "?" | Must -> str "!" | Once -> mt ()
 
 let wit_ssrmmod = add_genarg "ssrmmod" (fun env sigma -> pr_mmod)
-let ssrmmod = Pcoq.create_generic_entry Pcoq.utactic "ssrmmod" (Genarg.rawwit wit_ssrmmod);;
+let ssrmmod = Pcoq.create_generic_entry2 "ssrmmod" (Genarg.rawwit wit_ssrmmod);;
 
 }
 
@@ -1337,7 +1337,7 @@ ARGUMENT EXTEND ssrbinder TYPED AS (ssrfwdfmt * constr) PRINTED BY { pr_ssrbinde
 GRAMMAR EXTEND Gram
   GLOBAL: ssrbinder;
   ssrbinder: [
-  [  ["of" -> { () } | "&" -> { () } ]; c = operconstr LEVEL "99" -> {
+  [  ["of" -> { () } | "&" -> { () } ]; c = term LEVEL "99" -> {
      (FwdPose, [BFvar]),
      CAst.make ~loc @@ CLambdaN ([CLocalAssum ([CAst.make ~loc Anonymous],Default Glob_term.Explicit,c)],mkCHole (Some loc)) } ]
   ];
@@ -1594,18 +1594,18 @@ GRAMMAR EXTEND Gram
     | n = Prim.natural -> { ArgArg (check_index ~loc n) }
     ] ];
   ssrswap: [[ IDENT "first" -> { loc, true } | IDENT "last" -> { loc, false } ]];
-  ssrorelse: [[ "||"; tac = tactic_expr LEVEL "2" -> { tac } ]];
+  ssrorelse: [[ "||"; tac = ltac_expr LEVEL "2" -> { tac } ]];
   ssrseqarg: [
     [ arg = ssrswap -> { noindex, swaptacarg arg }
     | i = ssrseqidx; tac = ssrortacarg; def = OPT ssrorelse -> { i, (tac, def) }
     | i = ssrseqidx; arg = ssrswap -> { i, swaptacarg arg }
-    | tac = tactic_expr LEVEL "3" -> { noindex, (mk_hint tac, None) }
+    | tac = ltac_expr LEVEL "3" -> { noindex, (mk_hint tac, None) }
     ] ];
 END
 
 {
 
-let tactic_expr = Pltac.tactic_expr
+let ltac_expr = Pltac.ltac_expr
 
 }
 
@@ -1682,15 +1682,15 @@ let set_pr_ssrtac name prec afmt = (* FIXME *) () (*
 let ssrtac_expr ?loc name args = TacML (CAst.make ?loc (ssrtac_entry name, args))
 
 let tclintros_expr ?loc tac ipats =
-  let args = [Tacexpr.TacGeneric (in_gen (rawwit wit_ssrintrosarg) (tac, ipats))] in
+  let args = [Tacexpr.TacGeneric (None, in_gen (rawwit wit_ssrintrosarg) (tac, ipats))] in
   ssrtac_expr ?loc "tclintros" args
 
 }
 
 GRAMMAR EXTEND Gram
-  GLOBAL: tactic_expr;
-  tactic_expr: LEVEL "1" [ RIGHTA
-    [ tac = tactic_expr; intros = ssrintros_ne -> { tclintros_expr ~loc tac intros }
+  GLOBAL: ltac_expr;
+  ltac_expr: LEVEL "1" [ RIGHTA
+    [ tac = ltac_expr; intros = ssrintros_ne -> { tclintros_expr ~loc tac intros }
     ] ];
 END
 
@@ -1704,9 +1704,9 @@ END
 (* (Removing user-specified parentheses is dubious anyway).          *)
 
 GRAMMAR EXTEND Gram
-  GLOBAL: tactic_expr;
-  ssrparentacarg: [[ "("; tac = tactic_expr; ")" -> { CAst.make ~loc (Tacexp tac) } ]];
-  tactic_expr: LEVEL "0" [[ arg = ssrparentacarg -> { TacArg arg } ]];
+  GLOBAL: ltac_expr;
+  ssrparentacarg: [[ "("; tac = ltac_expr; ")" -> { CAst.make ~loc (Tacexp tac) } ]];
+  ltac_expr: LEVEL "0" [[ arg = ssrparentacarg -> { TacArg arg } ]];
 END
 
 (** The internal "done" and "ssrautoprop" tactics. *)
@@ -1741,7 +1741,7 @@ let tclBY tac = Tacticals.New.tclTHEN tac (donetac ~-1)
 (* The latter two are used in forward-chaining tactics (have, suffice, wlog) *)
 (* and subgoal reordering tacticals (; first & ; last), respectively.        *)
 
-(* Force use of the tactic_expr parsing entry, to rule out tick marks. *)
+(* Force use of the ltac_expr parsing entry, to rule out tick marks. *)
 
 (** The "by" tactical. *)
 
@@ -1777,17 +1777,17 @@ let _ = set_pr_ssrtac "tcldo" 3 [ArgSep "do "; ArgSsr "doarg"]
 
 let ssrdotac_expr ?loc n m tac clauses =
   let arg = ((n, m), tac), clauses in
-  ssrtac_expr ?loc "tcldo" [Tacexpr.TacGeneric (in_gen (rawwit wit_ssrdoarg) arg)]
+  ssrtac_expr ?loc "tcldo" [Tacexpr.TacGeneric (None, in_gen (rawwit wit_ssrdoarg) arg)]
 
 }
 
 GRAMMAR EXTEND Gram
-  GLOBAL: tactic_expr;
+  GLOBAL: ltac_expr;
   ssrdotac: [
-    [ tac = tactic_expr LEVEL "3" -> { mk_hint tac }
+    [ tac = ltac_expr LEVEL "3" -> { mk_hint tac }
     | tacs = ssrortacarg -> { tacs }
   ] ];
-  tactic_expr: LEVEL "3" [ RIGHTA
+  ltac_expr: LEVEL "3" [ RIGHTA
     [ IDENT "do"; m = ssrmmod; tac = ssrdotac; clauses = ssrclauses ->
       { ssrdotac_expr ~loc noindex m tac clauses }
     | IDENT "do"; tac = ssrortacarg; clauses = ssrclauses ->
@@ -1828,25 +1828,25 @@ let tclseq_expr ?loc tac dir arg =
   let arg1 = in_gen (rawwit wit_ssrtclarg) tac in
   let arg2 = in_gen (rawwit wit_ssrseqdir) dir in
   let arg3 = in_gen (rawwit wit_ssrseqarg) (check_seqtacarg dir arg) in
-  ssrtac_expr ?loc "tclseq" (List.map (fun x -> Tacexpr.TacGeneric x) [arg1; arg2; arg3])
+  ssrtac_expr ?loc "tclseq" (List.map (fun x -> Tacexpr.TacGeneric (None, x)) [arg1; arg2; arg3])
 
 }
 
 GRAMMAR EXTEND Gram
-  GLOBAL: tactic_expr;
+  GLOBAL: ltac_expr;
   ssr_first: [
     [ tac = ssr_first; ipats = ssrintros_ne -> { tclintros_expr ~loc tac ipats }
-    | "["; tacl = LIST0 tactic_expr SEP "|"; "]" -> { TacFirst tacl }
+    | "["; tacl = LIST0 ltac_expr SEP "|"; "]" -> { TacFirst tacl }
     ] ];
   ssr_first_else: [
     [ tac1 = ssr_first; tac2 = ssrorelse -> { TacOrelse (tac1, tac2) }
     | tac = ssr_first -> { tac } ]];
-  tactic_expr: LEVEL "4" [ LEFTA
-    [ tac1 = tactic_expr; ";"; IDENT "first"; tac2 = ssr_first_else ->
+  ltac_expr: LEVEL "4" [ LEFTA
+    [ tac1 = ltac_expr; ";"; IDENT "first"; tac2 = ssr_first_else ->
       { TacThen (tac1, tac2) }
-    | tac = tactic_expr; ";"; IDENT "first"; arg = ssrseqarg ->
+    | tac = ltac_expr; ";"; IDENT "first"; arg = ssrseqarg ->
       { tclseq_expr ~loc tac L2R arg }
-    | tac = tactic_expr; ";"; IDENT "last"; arg = ssrseqarg ->
+    | tac = ltac_expr; ";"; IDENT "last"; arg = ssrseqarg ->
       { tclseq_expr ~loc tac R2L arg }
     ] ];
 END
@@ -1894,7 +1894,8 @@ let has_occ ((_, occ), _) = occ <> None
 let gens_sep = function [], [] -> mt | _ -> spc
 
 let pr_dgens pr_gen (gensl, clr) =
-  let prgens s gens = str s ++ pr_list spc pr_gen gens in
+  let prgens s gens =
+  if CList.is_empty gens then mt () else str s ++ pr_list spc pr_gen gens in
   let prdeps deps = prgens ": " deps ++ spc () ++ str "/" in
   match gensl with
   | [deps; []] -> prdeps deps ++ pr_clear pr_spc clr
@@ -2194,7 +2195,7 @@ END
 
 let pr_ssrcongrarg _ _ _ ((n, f), dgens) =
   (if n <= 0 then mt () else str " " ++ int n) ++
-  str " " ++ pr_term f ++ pr_dgens pr_gen dgens
+  pr_term f ++ pr_dgens pr_gen dgens
 
 }
 
@@ -2447,11 +2448,11 @@ END
 
 (* The standard TACTIC EXTEND does not work for abstract *)
 GRAMMAR EXTEND Gram
-  GLOBAL: tactic_expr;
-  tactic_expr: LEVEL "3"
+  GLOBAL: ltac_expr;
+  ltac_expr: LEVEL "3"
     [ RIGHTA [ IDENT "abstract"; gens = ssrdgens ->
                { ssrtac_expr ~loc "abstract"
-                [Tacexpr.TacGeneric (Genarg.in_gen (Genarg.rawwit wit_ssrdgens) gens)] } ]];
+                [Tacexpr.TacGeneric (None, Genarg.in_gen (Genarg.rawwit wit_ssrdgens) gens)] } ]];
 END
 TACTIC EXTEND ssrabstract
 | [ "abstract" ssrdgens(gens) ] -> {

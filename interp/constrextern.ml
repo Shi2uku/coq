@@ -357,18 +357,18 @@ let destPatPrim = function { CAst.v = CPatPrim t } -> Some t | _ -> None
 let make_notation_gen loc ntn mknot mkprim destprim l bl =
   match snd ntn,List.map destprim l with
     (* Special case to avoid writing "- 3" for e.g. (Z.opp 3) *)
-    | "- _", [Some (Numeral p)] when not (NumTok.Signed.is_zero p) ->
+    | "- _", [Some (Number p)] when not (NumTok.Signed.is_zero p) ->
         assert (bl=[]);
         mknot (loc,ntn,([mknot (loc,(InConstrEntry,"( _ )"),l,[])]),[])
     | _ ->
         match decompose_notation_key ntn, l with
         | (InConstrEntry,[Terminal "-"; Terminal x]), [] ->
            begin match NumTok.Unsigned.parse_string x with
-           | Some n -> mkprim (loc, Numeral (NumTok.SMinus,n))
+           | Some n -> mkprim (loc, Number (NumTok.SMinus,n))
            | None -> mknot (loc,ntn,l,bl) end
         | (InConstrEntry,[Terminal x]), [] ->
            begin match NumTok.Unsigned.parse_string x with
-           | Some n -> mkprim (loc, Numeral (NumTok.SPlus,n))
+           | Some n -> mkprim (loc, Number (NumTok.SPlus,n))
            | None -> mknot (loc,ntn,l,bl) end
         | _ -> mknot (loc,ntn,l,bl)
 
@@ -551,7 +551,7 @@ and extern_notation_pattern allscopes vars t = function
   | [] -> raise No_match
   | (keyrule,pat,n as _rule)::rules ->
     try
-      if is_inactive_rule keyrule then raise No_match;
+      if is_inactive_rule keyrule || is_printing_inactive_rule keyrule pat then raise No_match;
       let loc = t.loc in
       match DAst.get t with
         | PatCstr (cstr,args,na) ->
@@ -568,7 +568,7 @@ let rec extern_notation_ind_pattern allscopes vars ind args = function
   | [] -> raise No_match
   | (keyrule,pat,n as _rule)::rules ->
     try
-      if is_inactive_rule keyrule then raise No_match;
+      if is_inactive_rule keyrule || is_printing_inactive_rule keyrule pat then raise No_match;
       apply_notation_to_pattern (GlobRef.IndRef ind)
         (match_notation_constr_ind_pattern ind args pat) allscopes vars keyrule
     with
@@ -915,7 +915,7 @@ let extern_float f scopes =
       let hex = !Flags.raw_print || not (get_printing_float ()) in
       if hex then Float64.to_hex_string f else Float64.to_string f in
     let n = NumTok.Signed.of_string s in
-    extern_prim_token_delimiter_if_required (Numeral n)
+    extern_prim_token_delimiter_if_required (Number n)
       "float" "float_scope" scopes
 
 (**********************************************************************)
@@ -978,7 +978,7 @@ let rec extern inctx ?impargs scopes vars r =
       if !print_meta_as_hole then CHole (None, IntroAnonymous, None) else
        (match kind with
          | Evar_kinds.SecondOrderPatVar n -> CPatVar n
-         | Evar_kinds.FirstOrderPatVar n -> CEvar (n,[]))
+         | Evar_kinds.FirstOrderPatVar n -> CEvar (CAst.make n,[]))
 
   | GApp (f,args) ->
       (match DAst.get f with
@@ -1097,13 +1097,13 @@ let rec extern inctx ?impargs scopes vars r =
 
   | GInt i ->
      extern_prim_token_delimiter_if_required
-       (Numeral (NumTok.Signed.of_int_string (Uint63.to_string i)))
+       (Number (NumTok.Signed.of_int_string (Uint63.to_string i)))
        "int63" "int63_scope" (snd scopes)
 
   | GFloat f -> extern_float f (snd scopes)
 
   | GArray(u,t,def,ty) ->
-    CArray(u,Array.map (extern inctx scopes vars) t, extern inctx scopes vars def, extern_typ scopes vars ty)
+    CArray(extern_universes u,Array.map (extern inctx scopes vars) t, extern inctx scopes vars def, extern_typ scopes vars ty)
 
   in insert_entry_coercion coercion (CAst.make ?loc c)
 
@@ -1238,7 +1238,7 @@ and extern_notation inctx (custom,scopes as allscopes) vars t rules =
   | (keyrule,pat,n as _rule)::rules ->
       let loc = Glob_ops.loc_of_glob_constr t in
       try
-        if is_inactive_rule keyrule then raise No_match;
+        if is_inactive_rule keyrule || is_printing_inactive_rule keyrule pat then raise No_match;
         let f,args =
           match DAst.get t with
           | GApp (f,args) -> f,args
@@ -1391,7 +1391,7 @@ let rec glob_of_pat avoid env sigma pat = DAst.make @@ match pat with
       | None -> Id.of_string "__"
       | Some id -> id
       in
-      GEvar (id,List.map (on_snd (glob_of_pat avoid env sigma)) l)
+      GEvar (CAst.make id,List.map (fun (id,c) -> (CAst.make id, glob_of_pat avoid env sigma c)) l)
   | PRel n ->
       let id = try match lookup_name_of_rel n env with
         | Name id   -> id

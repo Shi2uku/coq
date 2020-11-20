@@ -237,7 +237,7 @@ and subst_tacarg subst = function
   | TacPretype c -> TacPretype (subst_glob_constr subst c)
   | TacNumgoals -> TacNumgoals
   | Tacexp t -> Tacexp (subst_tactic subst t)
-  | TacGeneric arg -> TacGeneric (subst_genarg subst arg)
+  | TacGeneric (isquot,arg) -> TacGeneric (isquot,subst_genarg subst arg)
 
 (* Reads the rules of a Match Context or a Match *)
 and subst_match_rule subst = function
@@ -282,7 +282,7 @@ let () =
   Genintern.register_subst0 wit_smart_global subst_global_reference;
   Genintern.register_subst0 wit_pre_ident (fun _ v -> v);
   Genintern.register_subst0 wit_ident (fun _ v -> v);
-  Genintern.register_subst0 wit_var (fun _ v -> v);
+  Genintern.register_subst0 wit_hyp (fun _ v -> v);
   Genintern.register_subst0 wit_intropattern subst_intro_pattern [@warning "-3"];
   Genintern.register_subst0 wit_simple_intropattern subst_intro_pattern;
   Genintern.register_subst0 wit_tactic subst_tactic;

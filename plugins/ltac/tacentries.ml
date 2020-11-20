@@ -31,21 +31,9 @@ type argument = Genarg.ArgT.any Extend.user_symbol
 (**********************************************************************)
 (* Interpret entry names of the form "ne_constr_list" as entry keys   *)
 
-let coincide s pat off =
-  let len = String.length pat in
-  let break = ref true in
-  let i = ref 0 in
-  while !break && !i < len do
-    let c = Char.code s.[off + !i] in
-    let d = Char.code pat.[!i] in
-    break := Int.equal c d;
-    incr i
-  done;
-  !break
-
 let atactic n =
   if n = 5 then Pcoq.Symbol.nterm Pltac.binder_tactic
-  else Pcoq.Symbol.nterml Pltac.tactic_expr (string_of_int n)
+  else Pcoq.Symbol.nterml Pltac.ltac_expr (string_of_int n)
 
 type entry_name = EntryName :
   'a raw_abstract_argument_type * (Tacexpr.raw_tactic_expr, _, 'a) Pcoq.Symbol.t -> entry_name
@@ -70,28 +58,37 @@ let check_separator ?loc = function
 | Some _ -> user_err ?loc (str "Separator is only for arguments with suffix _list_sep.")
 
 let rec parse_user_entry ?loc s sep =
-  let l = String.length s in
-  if l > 8 && coincide s "ne_" 0 && coincide s "_list" (l - 5) then
-    let entry = parse_user_entry ?loc (String.sub s 3 (l-8)) None in
+  let open CString in
+  let matches pre suf s =
+    String.length s > (String.length pre + String.length suf) &&
+      is_prefix pre s && is_suffix suf s
+  in
+  let basename pre suf s =
+    let plen = String.length pre in
+    String.sub s plen (String.length s - (plen + String.length suf))
+  in
+  let tactic_len = String.length "tactic" in
+  if matches "ne_" "_list" s then
+    let entry = parse_user_entry ?loc (basename "ne_" "_list" s) None in
     check_separator ?loc sep;
     Ulist1 entry
-  else if l > 12 && coincide s "ne_" 0 &&
-                   coincide s "_list_sep" (l-9) then
-    let entry = parse_user_entry ?loc (String.sub s 3 (l-12)) None in
+  else if matches "ne_" "_list_sep" s then
+    let entry = parse_user_entry ?loc (basename "ne_" "_list_sep" s) None in
     Ulist1sep (entry, get_separator sep)
-  else if l > 5 && coincide s "_list" (l-5) then
-    let entry = parse_user_entry ?loc (String.sub s 0 (l-5)) None in
+  else if matches "" "_list" s then
+    let entry = parse_user_entry ?loc (basename "" "_list" s) None in
     check_separator ?loc sep;
     Ulist0 entry
-  else if l > 9 && coincide s "_list_sep" (l-9) then
-    let entry = parse_user_entry ?loc (String.sub s 0 (l-9)) None in
+  else if matches "" "_list_sep" s then
+    let entry = parse_user_entry ?loc (basename "" "_list_sep" s) None in
     Ulist0sep (entry, get_separator sep)
-  else if l > 4 && coincide s "_opt" (l-4) then
-    let entry = parse_user_entry ?loc (String.sub s 0 (l-4)) None in
+  else if matches "" "_opt" s then
+    let entry = parse_user_entry ?loc (basename "" "_opt" s) None in
     check_separator ?loc sep;
     Uopt entry
-  else if Int.equal l 7 && coincide s "tactic" 0 && '5' >= s.[6] && s.[6] >= '0' then
-    let n = Char.code s.[6] - 48 in
+  else if String.length s = tactic_len + 1 && is_prefix "tactic" s
+      && '5' >= s.[tactic_len] && s.[tactic_len] >= '0' then
+    let n = Char.code s.[tactic_len] - Char.code '0' in
     check_separator ?loc sep;
     Uentryl ("tactic", n)
   else
@@ -119,7 +116,7 @@ let get_tactic_entry n =
   else if Int.equal n 5 then
     Pltac.binder_tactic, None
   else if 1<=n && n<5 then
-    Pltac.tactic_expr, Some (Gramlib.Gramext.Level (string_of_int n))
+    Pltac.ltac_expr, Some (Gramlib.Gramext.Level (string_of_int n))
   else
     user_err Pp.(str ("Invalid Tactic Notation level: "^(string_of_int n)^"."))
 
@@ -159,7 +156,7 @@ let rec prod_item_of_symbol lev = function
   EntryName (Rawwit wit, Pcoq.Symbol.nterm (genarg_grammar wit))
 | Extend.Uentryl (s, n) ->
   let ArgT.Any tag = s in
-  assert (coincide (ArgT.repr tag) "tactic" 0);
+  assert (CString.is_suffix "tactic" (ArgT.repr tag));
   get_tacentry n lev
 
 (** Tactic grammar extensions *)
@@ -174,7 +171,7 @@ let add_tactic_entry (kn, ml, tg) state =
       if Genarg.has_type arg wit && not ml then
         Tacexp (Genarg.out_gen wit arg)
       else
-        TacGeneric arg
+        TacGeneric (None, arg)
     in
     let l = List.map map l in
     (TacAlias (CAst.make ~loc (kn,l)):raw_tactic_expr)
@@ -219,7 +216,9 @@ let interp_prod_item = function
     | None ->
       if String.Map.mem s !entry_names then String.Map.find s !entry_names
       else begin match ArgT.name s with
-      | None -> user_err Pp.(str ("Unknown entry "^s^"."))
+      | None ->
+         if s = "var" then user_err Pp.(str ("var is deprecated, use hyp.")) (* to remove in 8.14 *)
+         else user_err Pp.(str ("Unknown entry "^s^"."))
       | Some arg -> arg
       end
     | Some n ->
@@ -349,7 +348,7 @@ let extend_atomic_tactic name entries =
     | TacNonTerm (_, (symb, _)) ->
       let EntryName (typ, e) = prod_item_of_symbol 0 symb in
       let Genarg.Rawwit wit = typ in
-      let inj x = TacArg (CAst.make @@ TacGeneric (Genarg.in_gen typ x)) in
+      let inj x = TacArg (CAst.make @@ TacGeneric (None, Genarg.in_gen typ x)) in
       let default = epsilon_value inj e in
       match default with
       | None -> raise NonEmptyArgument
@@ -384,7 +383,7 @@ let add_ml_tactic_notation name ~level ?deprecation prods =
   in
   List.iteri iter (List.rev prods);
   (* We call [extend_atomic_tactic] only for "basic tactics" (the ones
-     at tactic_expr level 0) *)
+     at ltac_expr level 0) *)
   if Int.equal level 0 then extend_atomic_tactic name prods
 
 (**********************************************************************)
@@ -421,7 +420,7 @@ let create_ltac_quotation name cast (e, l) =
   in
   let action _ v _ _ _ loc = cast (Some loc, v) in
   let gram = (level, assoc, [Pcoq.Production.make rule action]) in
-  Pcoq.grammar_extend Pltac.tactic_arg {pos=None; data=[gram]}
+  Pcoq.grammar_extend Pltac.tactic_value {pos=None; data=[gram]}
 
 (** Command *)
 
@@ -529,16 +528,40 @@ let print_ltacs () =
 
 let locatable_ltac = "Ltac"
 
+let split_ltac_fun = function
+  | Tacexpr.TacFun (l,t) -> (l,t)
+  | t -> ([],t)
+
+let pr_ltac_fun_arg n = spc () ++ Name.print n
+
+let print_ltac_body qid tac =
+  let filter mp =
+    try Some (Nametab.shortest_qualid_of_module mp)
+    with Not_found -> None
+  in
+  let mods = List.map_filter filter tac.Tacenv.tac_redef in
+  let redefined = match mods with
+  | [] -> mt ()
+  | mods ->
+    let redef = prlist_with_sep fnl pr_qualid mods in
+    fnl () ++ str "Redefined by:" ++ fnl () ++ redef
+  in
+  let l,t = split_ltac_fun tac.Tacenv.tac_body in
+  hv 2 (
+    hov 2 (str "Ltac" ++ spc() ++ pr_qualid qid ++
+           prlist pr_ltac_fun_arg l ++ spc () ++ str ":=")
+    ++ spc() ++ Pptactic.pr_glob_tactic (Global.env ()) t) ++ redefined
+
 let () =
   let open Prettyp in
-  let locate qid = try Some (Tacenv.locate_tactic qid) with Not_found -> None in
-  let locate_all = Tacenv.locate_extended_all_tactic in
-  let shortest_qualid = Tacenv.shortest_qualid_of_tactic in
-  let name kn = str "Ltac" ++ spc () ++ pr_path (Tacenv.path_of_tactic kn) in
-  let print kn =
-    let qid = qualid_of_path (Tacenv.path_of_tactic kn) in
-    Tacintern.print_ltac qid
-  in
+  let locate qid = try Some (qid, Tacenv.locate_tactic qid) with Not_found -> None in
+  let locate_all qid = List.map (fun kn -> (qid,kn)) (Tacenv.locate_extended_all_tactic qid) in
+  let shortest_qualid (qid,kn) = Tacenv.shortest_qualid_of_tactic kn in
+  let name (qid,kn) = str "Ltac" ++ spc () ++ pr_path (Tacenv.path_of_tactic kn) in
+  let print (qid,kn) =
+    let entries = Tacenv.ltac_entries () in
+    let tac = KNmap.find kn entries in
+    print_ltac_body qid tac in
   let about = name in
   register_locatable locatable_ltac {
     locate;
@@ -552,14 +575,25 @@ let () =
 let print_located_tactic qid =
   Feedback.msg_notice (Prettyp.print_located_other locatable_ltac qid)
 
+let print_ltac id =
+ try
+  let kn = Tacenv.locate_tactic id in
+  let entries = Tacenv.ltac_entries () in
+  let tac = KNmap.find kn entries in
+  print_ltac_body id tac
+ with
+  Not_found ->
+   user_err ~hdr:"print_ltac"
+    (pr_qualid id ++ spc() ++ str "is not a user defined tactic.")
+
 (** Grammar *)
 
 let () =
   let entries = [
-    AnyEntry Pltac.tactic_expr;
+    AnyEntry Pltac.ltac_expr;
     AnyEntry Pltac.binder_tactic;
     AnyEntry Pltac.simple_tactic;
-    AnyEntry Pltac.tactic_arg;
+    AnyEntry Pltac.tactic_value;
   ] in
   register_grammars_by_name "tactic" entries
 
@@ -780,7 +814,7 @@ let ml_val_tactic_extend ~plugin ~name ~local ?deprecation sign tac =
   let ml_tactic_name = { mltac_tactic = name; mltac_plugin = plugin } in
   let len = ml_sig_len sign in
   let vars = List.init len (fun i -> Id.of_string (Printf.sprintf "arg%i" i)) in
-  let body = TacGeneric (in_tacval { tacval_tac = ml_tactic_name;  tacval_var = vars }) in
+  let body = TacGeneric (None, in_tacval { tacval_tac = ml_tactic_name;  tacval_var = vars }) in
   let vars = List.map (fun id -> Name id) vars in
   let body = Tacexpr.TacFun (vars, Tacexpr.TacArg (CAst.make body)) in
   let id = Names.Id.of_string name in
@@ -869,14 +903,14 @@ let argument_extend (type a b c) ~name (arg : (a, b, c) tactic_argument) =
     let () = Pcoq.register_grammar wit e in
     e
   | Vernacextend.Arg_rules rules ->
-    let e = Pcoq.create_generic_entry Pcoq.utactic name (Genarg.rawwit wit) in
+    let e = Pcoq.create_generic_entry2 name (Genarg.rawwit wit) in
     let () = Pcoq.grammar_extend e {pos=None; data=[(None, None, rules)]} in
     e
   in
   let (rpr, gpr, tpr) = arg.arg_printer in
   let () = Pptactic.declare_extra_genarg_pprule wit rpr gpr tpr in
   let () = create_ltac_quotation name
-    (fun (loc, v) -> Tacexpr.TacGeneric (Genarg.in_gen (Genarg.rawwit wit) v))
+    (fun (loc, v) -> Tacexpr.TacGeneric (Some name,Genarg.in_gen (Genarg.rawwit wit) v))
     (entry, None)
   in
   (wit, entry)

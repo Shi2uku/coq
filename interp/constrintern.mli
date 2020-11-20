@@ -136,9 +136,15 @@ val interp_type_evars_impls : ?flags:inference_flags -> env -> evar_map ->
 
 (** Interprets constr patterns *)
 
+(** Without typing *)
 val intern_constr_pattern :
   env -> evar_map -> ?as_type:bool -> ?ltacvars:ltac_sign ->
     constr_pattern_expr -> patvar list * constr_pattern
+
+(** With typing *)
+val interp_constr_pattern :
+  env -> evar_map -> ?expected_type:typing_constraint ->
+    constr_pattern_expr -> constr_pattern
 
 (** Raise Not_found if syndef not bound to a name and error if unexisting ref *)
 val intern_reference : qualid -> GlobRef.t
@@ -156,7 +162,7 @@ val interp_binder_evars : env -> evar_map -> Name.t -> constr_expr -> evar_map *
 (** Interpret contexts: returns extended env and context *)
 
 val interp_context_evars :
-  ?program_mode:bool -> ?impl_env:internalization_env -> ?shift:int ->
+  ?program_mode:bool -> ?impl_env:internalization_env ->
   env -> evar_map -> local_binder_expr list ->
   evar_map * (internalization_env * ((env * rel_context) * Impargs.manual_implicits))
 
@@ -191,3 +197,15 @@ val get_asymmetric_patterns : unit -> bool
 val check_duplicate : ?loc:Loc.t -> (qualid * constr_expr) list -> unit
 (** Check that a list of record field definitions doesn't contain
     duplicates. *)
+
+(** Local universe and constraint declarations. *)
+val interp_univ_decl : Environ.env -> universe_decl_expr ->
+                       Evd.evar_map * UState.universe_decl
+
+val interp_univ_decl_opt : Environ.env -> universe_decl_expr option ->
+                       Evd.evar_map * UState.universe_decl
+
+val interp_cumul_univ_decl_opt : Environ.env -> cumul_univ_decl_expr option ->
+  Evd.evar_map * UState.universe_decl * Entries.variance_entry
+(** BEWARE the variance entry needs to be adjusted by
+   [ComInductive.variance_of_entry] if the instance is extensible. *)

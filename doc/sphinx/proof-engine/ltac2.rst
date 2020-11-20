@@ -3,8 +3,8 @@
 Ltac2
 =====
 
-The Ltac tactic language is probably one of the ingredients of the success of
-Coq, yet it is at the same time its Achilles' heel. Indeed, Ltac:
+The |Ltac| tactic language is probably one of the ingredients of the success of
+Coq, yet it is at the same time its Achilles' heel. Indeed, |Ltac|:
 
 - has often unclear semantics
 - is very non-uniform due to organic growth
@@ -38,7 +38,6 @@ Current limitations include:
   - Printing functions are limited and awkward to use.  Only a few data types are
     printable.
   - Deep pattern matching and matching on tuples don't work.
-  - If statements on Ltac2 boolean values
   - A convenient way to build terms with casts through the low-level API. Because the
     cast type is opaque, building terms with casts currently requires an awkward construction like the
     following, which also incurs extra overhead to repeat typechecking for each
@@ -228,7 +227,7 @@ One can define new types with the following commands.
    :name: Ltac2 external
 
    Declares abstract terms.  Frequently, these declare OCaml functions
-   defined in |Coq| and give their type information.  They can also declare
+   defined in Coq and give their type information.  They can also declare
    data structures from OCaml.  This command has no use for the end user.
 
 APIs
@@ -283,7 +282,7 @@ There is dedicated syntax for list and array literals.
    | [ {*; @ltac2_expr5 } ]
    | %{ {? {+ @tac2rec_fieldexpr } {? ; } } %}
    | @ltac2_tactic_atom
-   ltac2_tactic_atom ::= @int
+   ltac2_tactic_atom ::= @integer
    | @string
    | @qualid
    | @ @ident
@@ -345,12 +344,10 @@ Ltac2 Definitions
 
       .. coqtop:: all
 
-         Ltac2 mutable rec f b := match b with true => 0 | _ => f true end.
-         Ltac2 Set f := fun b =>
-                  match b with true => 1 | _ => f true end.
+         Ltac2 mutable rec f b := if b then 0 else f true.
+         Ltac2 Set f := fun b => if b then 1 else f true.
          Ltac2 Eval (f false).
-         Ltac2 Set f as oldf := fun b =>
-                  match b with true => 2 | _ => oldf false end.
+         Ltac2 Set f as oldf := fun b => if b then  2 else oldf false.
          Ltac2 Eval (f false).
 
       In the definition, the `f` in the body is resolved statically
@@ -537,7 +534,7 @@ aware of bound variables and must use heuristics to decide whether a variable
 is a proper one or referring to something in the Ltac context.
 
 Likewise, in Ltac1, constr parsing is implicit, so that ``foo 0`` is
-not ``foo`` applied to the Ltac integer expression ``0`` (Ltac does have a
+not ``foo`` applied to the Ltac integer expression ``0`` (|Ltac| does have a
 notion of integers, though it is not first-class), but rather the Coq term
 :g:`Datatypes.O`.
 
@@ -565,7 +562,7 @@ Built-in quotations
    | ltac1 : ( @ltac1_expr_in_env )
    | ltac1val : ( @ltac1_expr_in_env )
    ltac1_expr_in_env ::= @ltac_expr
-   | {* @ident } |- @ltac_expr
+   | {* @ident } %|- @ltac_expr
 
 The current implementation recognizes the following built-in quotations:
 
@@ -981,7 +978,7 @@ Match over goals
    .. prodn::
       goal_match_list ::= {? %| } {+| @gmatch_rule }
       gmatch_rule ::= @gmatch_pattern => @ltac2_expr
-      gmatch_pattern ::= [ {*, @gmatch_hyp_pattern } |- @ltac2_match_pattern ]
+      gmatch_pattern ::= [ {*, @gmatch_hyp_pattern } %|- @ltac2_match_pattern ]
       gmatch_hyp_pattern ::= @name : @ltac2_match_pattern
 
    Matches over goals, similar to Ltac1 :tacn:`match goal`.
@@ -1149,6 +1146,13 @@ Match on values
       | @tac2pat1 , {*, @tac2pat1 }
       | @tac2pat1
 
+.. tacn:: if @ltac2_expr5__test then @ltac2_expr5__then else @ltac2_expr5__else
+   :name: if-then-else (Ltac2)
+
+   Equivalent to a :tacn:`match <match (Ltac2)>` on a boolean value.  If the
+   :n:`@ltac2_expr5__test` evaluates to true, :n:`@ltac2_expr5__then`
+   is evaluated.  Otherwise :n:`@ltac2_expr5__else` is evaluated.
+
 .. note::
 
    For now, deep pattern matching is not implemented.
@@ -1159,7 +1163,7 @@ Match on values
 Notations
 ---------
 
-.. cmd:: Ltac2 Notation {+ @ltac2_scope } {? : @int } := @ltac2_expr
+.. cmd:: Ltac2 Notation {+ @ltac2_scope } {? : @natural } := @ltac2_expr
    :name: Ltac2 Notation
 
    .. todo seems like name maybe should use lident rather than ident, considering:
@@ -1177,12 +1181,12 @@ Notations
 
    :cmd:`Ltac2 Notation` provides a way to extend the syntax of Ltac2 tactics.  The left-hand
    side (before the `:=`) defines the syntax to recognize and gives formal parameter
-   names for the syntactic values.  :n:`@int` is the level of the notation.
+   names for the syntactic values.  :n:`@integer` is the level of the notation.
    When the notation is used, the values are substituted
    into the right-hand side.  The right-hand side is typechecked when the notation is used,
    not when it is defined.  In the following example, `x` is the formal parameter name and
    `constr` is its :ref:`syntactic class<syntactic_classes>`.  `print` and `of_constr` are
-   functions provided by |Coq| through `Message.v`.
+   functions provided by Coq through `Message.v`.
 
    .. todo "print" doesn't seem to pay attention to "Set Printing All"
 
@@ -1281,7 +1285,7 @@ Abbreviations
 Defining tactics
 ~~~~~~~~~~~~~~~~
 
-Built-in tactics (those defined in OCaml code in the |Coq| executable) and Ltac1 tactics,
+Built-in tactics (those defined in OCaml code in the Coq executable) and Ltac1 tactics,
 which are defined in `.v` files, must be defined through notations.  (Ltac2 tactics can be
 defined with :cmd:`Ltac2`.
 
@@ -1289,12 +1293,12 @@ Notations for many but not all built-in tactics are defined in `Notations.v`, wh
 loaded with Ltac2.  The Ltac2 syntax for these tactics is often identical or very similar to the
 tactic syntax described in other chapters of this documentation.  These notations rely on tactic functions
 declared in `Std.v`.  Functions corresponding to some built-in tactics may not yet be defined in the
-|Coq| executable or declared in `Std.v`.  Adding them may require code changes to |Coq| or defining
+Coq executable or declared in `Std.v`.  Adding them may require code changes to Coq or defining
 workarounds through Ltac1 (described below).
 
 Two examples of syntax differences:
 
-- There is no notation defined that's equivalent to :n:`intros until {| @ident | @num }`.  There is,
+- There is no notation defined that's equivalent to :n:`intros until {| @ident | @natural }`.  There is,
   however, already an ``intros_until`` tactic function defined ``Std.v``, so it may be possible for a user
   to add the necessary notation.
 - The built-in `simpl` tactic in Ltac1 supports the use of scope keys in delta flags, e.g. :n:`simpl ["+"%nat]`
@@ -1321,7 +1325,7 @@ Syntactic classes
 ~~~~~~~~~~~~~~~~~
 
 The simplest syntactic classes in Ltac2 notations represent individual nonterminals
-from the |Coq| grammar.  Only a few selected nonterminals are available as syntactic classes.
+from the Coq grammar.  Only a few selected nonterminals are available as syntactic classes.
 In addition, there are metasyntactic operations for describing
 more complex syntax, such as making an item optional or representing a list of items.
 When parsing, each syntactic class expression returns a value that's bound to a name in the
@@ -1333,7 +1337,7 @@ Syntactic classes are described with a form of S-expression:
 
    .. prodn::
       ltac2_scope ::= @string
-      | @int
+      | @integer
       | @name
       | @name ( {+, @ltac2_scope } )
 
@@ -1384,14 +1388,14 @@ table further down lists the classes that that are handled plainly.
   :n:`terminal(@string)`
     Accepts the specified string whether it's a keyword or not, returning a value of `()`.
 
-  :n:`tactic {? (@int) }`
-    Parses an :token:`ltac2_expr`.  If :token:`int` is specified, the construct
-    parses a :n:`ltac2_expr@int`, for example `tactic(5)` parses :token:`ltac2_expr5`.
+  :n:`tactic {? (@integer) }`
+    Parses an :token:`ltac2_expr`.  If :token:`integer` is specified, the construct
+    parses a :n:`ltac2_expr@integer`, for example `tactic(5)` parses :token:`ltac2_expr5`.
     `tactic(6)` parses :token:`ltac2_expr`.
-    :token:`int` must be in the range `0 .. 6`.
+    :token:`integer` must be in the range `0 .. 6`.
 
-    You can also use `tactic` to accept an :token:`int` or a :token:`string`, but there's
-    no syntactic class that accepts *only* an :token:`int` or a :token:`string`.
+    You can also use `tactic` to accept an :token:`integer` or a :token:`string`, but there's
+    no syntactic class that accepts *only* an :token:`integer` or a :token:`string`.
 
     .. todo this doesn't work as expected: "::" is in ltac2_expr1
        Ltac2 Notation "ex4" x(tactic(0)) := x.
@@ -1555,7 +1559,7 @@ Here is the syntax for the :n:`q_*` nonterminals:
 .. insertprodn 	ltac2_destruction_arg ltac2_constr_with_bindings
 
 .. prodn::
-   ltac2_destruction_arg ::= @num
+   ltac2_destruction_arg ::= @natural
    | @lident
    | @ltac2_constr_with_bindings
    ltac2_constr_with_bindings ::= @term {? with @ltac2_bindings }
@@ -1568,7 +1572,7 @@ Here is the syntax for the :n:`q_*` nonterminals:
    | {+ @term }
    ltac2_simple_binding ::= ( @qhyp := @term )
    qhyp ::= $ @ident
-   | @num
+   | @natural
    | @lident
 
 .. insertprodn ltac2_strategy_flag ltac2_delta_flag
@@ -1598,15 +1602,15 @@ Here is the syntax for the :n:`q_*` nonterminals:
    ltac2_clause ::= in @ltac2_in_clause
    | at @ltac2_occs_nums
    ltac2_in_clause ::= * {? @ltac2_occs }
-   | * |- {? @ltac2_concl_occ }
-   | {*, @ltac2_hypident_occ } {? |- {? @ltac2_concl_occ } }
+   | * %|- {? @ltac2_concl_occ }
+   | {*, @ltac2_hypident_occ } {? %|- {? @ltac2_concl_occ } }
 
 .. insertprodn q_occurrences ltac2_hypident
 
 .. prodn::
    q_occurrences ::= {? @ltac2_occs }
    ltac2_occs ::= at @ltac2_occs_nums
-   ltac2_occs_nums ::= {? - } {+ {| @num  | $ @ident } }
+   ltac2_occs_nums ::= {? - } {+ {| @natural  | $ @ident } }
    ltac2_concl_occ ::= * {? @ltac2_occs }
    ltac2_hypident_occ ::= @ltac2_hypident {? @ltac2_occs }
    ltac2_hypident ::= @ident_or_anti
@@ -1629,8 +1633,8 @@ Here is the syntax for the :n:`q_*` nonterminals:
 .. insertprodn ltac2_oriented_rewriter ltac2_rewriter
 
 .. prodn::
-   ltac2_oriented_rewriter ::= {| -> | <- } @ltac2_rewriter
-   ltac2_rewriter ::= {? @num } {? {| ? | ! } } @ltac2_constr_with_bindings
+   ltac2_oriented_rewriter ::= {? {| -> | <- } } @ltac2_rewriter
+   ltac2_rewriter ::= {? @natural } {? {| ? | ! } } @ltac2_constr_with_bindings
 
 .. insertprodn ltac2_for_each_goal ltac2_goal_tactics
 

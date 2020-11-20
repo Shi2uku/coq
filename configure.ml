@@ -688,23 +688,25 @@ let operating_system =
   else
     (try Sys.getenv "OS" with Not_found -> "")
 
-(** Zarith and num libraries *)
+(** Zarith library *)
 
-let check_for_numlib () =
-  (if caml_version_nums >= [4;6;0] then
-    let numlib,_ = tryrun camlexec.find ["query";"num"] in
-    match numlib with
-    | ""  ->
-      die "Num library not installed, required for OCaml 4.06 or later"
-    | _   -> cprintf "You have the Num library installed. Good!");
+let check_for_zarith () =
   let zarith,_ = tryrun camlexec.find ["query";"zarith"] in
+  let zarith_cmai base = Sys.file_exists (base / "z.cmi") && Sys.file_exists (base / "zarith.cma") in
+  let zarith_version, _ = run camlexec.find ["query"; "zarith"; "-format"; "%v"] in
   match zarith with
   | ""  ->
     die "Zarith library not installed, required"
-  | _   -> cprintf "You have the Zarith library installed. Good!"
+  | _ when not (zarith_cmai zarith) ->
+    die "Zarith library installed but no development files found (try installing the -dev package)"
+  | _   ->
+    let zarith_version_int = List.map int_of_string (numeric_prefix_list zarith_version) in
+    if zarith_version_int >= [1;10;0] then
+      cprintf "You have the Zarith library %s installed. Good!" zarith_version
+    else
+      die ("Zarith version 1.10 is required, you have " ^ zarith_version)
 
-let numlib =
-  check_for_numlib ()
+let numlib = check_for_zarith ()
 
 (** * lablgtk3 and CoqIDE *)
 
@@ -717,20 +719,14 @@ let get_lablgtkdir () =
 
 let check_lablgtk_version () =
   let v, _ = tryrun camlexec.find ["query"; "-format"; "%v"; "lablgtk3"] in
-  (true, v)
-
-(* ejgallego: we wait to do version checks until an official release is out *)
-(*  try
-    let vi = numeric_prefix_list v in
-    (* Temporary hack *)
-    if vi = ["3";"0";"beta3"] then (false, v) else
-    let vi = List.map s2i vi in
-    if vi < [3; 0; 0] then
+  try
+    let vl = numeric_prefix_list v in
+    let vn = List.map int_of_string vl in
+    if vn < [3; 1; 0] then
       (false, v)
     else
       (true, v)
   with _ -> (false, v)
-*)
 
 let pr_ide = function No -> "no" | Byte -> "only bytecode" | Opt -> "native"
 
@@ -758,7 +754,7 @@ let check_coqide () =
   else
     let (ok, version) = check_lablgtk_version () in
     let found = sprintf "LablGtk3 and LablGtkSourceView3 found (%s)" version in
-    if not ok then set_ide No (found^", but too old (required >= 3.0, found " ^ version ^ ")");
+    if not ok then set_ide No (found^", but too old (required >= 3.1.0, found " ^ version ^ ")");
     (* We're now sure to produce at least one kind of coqide *)
     lablgtkdir := shorten_camllib dir;
     if !prefs.coqide = Some Byte then set_ide Byte (found^", bytecode requested");

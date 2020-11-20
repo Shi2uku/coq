@@ -45,6 +45,8 @@ let should_gname =
     ~key:["Printing";"Goal";"Names"]
     ~value:false
 
+let print_goal_names = should_gname (* for export *)
+
 (**********************************************************************)
 (** Terms                                                             *)
 
@@ -765,9 +767,9 @@ let pr_subgoals ?(pr_first=true) ?(diffs=false) ?os_map
       v 0 (
         int ngoals ++ focused_if_needed ++ str(String.plural ngoals "subgoal")
         ++ print_extra
-        ++ str (if (should_gname()) then ", subgoal 1" else "")
-        ++ (if should_tag() then pr_goal_tag g1 else str"")
-        ++ pr_goal_name sigma g1 ++ cut () ++ goals
+        ++ str (if pr_first && (should_gname()) && ngoals > 1 then ", subgoal 1" else "")
+        ++ (if pr_first && should_tag() then pr_goal_tag g1 else str"")
+        ++ (if pr_first then pr_goal_name sigma g1 else mt()) ++ cut () ++ goals
         ++ (if unfocused=[] then str ""
            else (cut() ++ cut() ++ str "*** Unfocused goals:" ++ cut()
                  ++ pr_rec (List.length rest + 2) unfocused))
@@ -884,7 +886,7 @@ struct
       MutInd.CanOrd.compare m1 m2
     | Guarded k1 , Guarded k2
     | TypeInType k1, TypeInType k2 ->
-      GlobRef.Ordered.compare k1 k2
+      GlobRef.CanOrd.compare k1 k2
     | Constant _, _ -> -1
     | _, Constant _ -> 1
     | Positive _, _ -> -1

@@ -95,7 +95,7 @@ and conv_atom env pb k a1 stk1 a2 stk2 cu =
 (*  Pp.(msg_debug (str "conv_atom(" ++ pr_atom a1 ++ str ", " ++ pr_atom a2 ++ str ")")) ; *)
   match a1, a2 with
   | Aind ((mi,_i) as ind1) , Aind ind2 ->
-    if eq_ind ind1 ind2 && compare_stack stk1 stk2 then
+    if Ind.CanOrd.equal ind1 ind2 && compare_stack stk1 stk2 then
       let ulen = Univ.AUContext.size (Environ.mind_context env mi) in
       if ulen = 0 then
         conv_stack env k stk1 stk2 cu
@@ -141,7 +141,7 @@ and conv_stack env k stk1 stk2 cu =
         conv_stack env k stk1 stk2 !rcu
       else raise NotConvertible
   | Zproj p1 :: stk1, Zproj p2 :: stk2 ->
-    if Projection.Repr.equal p1 p2 then conv_stack env k stk1 stk2 cu
+    if Projection.Repr.CanOrd.equal p1 p2 then conv_stack env k stk1 stk2 cu
     else raise NotConvertible
   | [], _ | Zapp _ :: _, _ | Zfix _ :: _, _ | Zswitch _ :: _, _
   | Zproj _ :: _, _ -> raise NotConvertible
@@ -211,5 +211,5 @@ let vm_conv cv_pb env t1 t2 =
     else Constr.eq_constr_univs univs t1 t2
   in
   if not b then
-    let univs = (univs, checked_universes) in
-    let _ = vm_conv_gen cv_pb env univs t1 t2 in ()
+    let state = (univs, checked_universes) in
+    let _ = vm_conv_gen cv_pb env state t1 t2 in ()

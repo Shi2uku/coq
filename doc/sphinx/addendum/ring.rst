@@ -10,8 +10,8 @@
 
 .. _theringandfieldtacticfamilies:
 
-The ring and field tactic families
-====================================
+ring and field: solvers for polynomial and rational equations
+=============================================================
 
 :Author: Bruno Barras, Benjamin Grégoire, Assia Mahboubi, Laurent Théry [#f1]_
 
@@ -102,7 +102,7 @@ forget this paragraph and use the tactic according to your intuition.
 Concrete usage in Coq
 --------------------------
 
-.. tacn:: ring {? [ {+ @term } ] }
+.. tacn:: ring {? [ {+ @one_term } ] }
 
    Solves polynomical equations of a ring
    (or semiring) structure. It proceeds by normalizing both sides
@@ -110,13 +110,34 @@ Concrete usage in Coq
    distributivity, constant propagation, rewriting of monomials) and
    syntactically comparing the results.
 
-.. tacn:: ring_simplify {? [ {+ @term } ] } {+ @term } {? in @ident }
+   :n:`[ {+ @one_term } ]`
+     If specified, the tactic decides the equality of two terms modulo ring operations and
+     the equalities defined by the :token:`one_term`\s.
+     Each :token:`one_term` has to be a proof of some equality :g:`m = p`, where :g:`m`
+     is a monomial (after “abstraction”), :g:`p` a polynomial and :g:`=` is the
+     corresponding equality of the ring structure.
+
+.. tacn:: ring_simplify {? [ {+ @one_term } ] } {+ @one_term } {? in @ident }
 
    Applies the normalization procedure described above to
-   the given terms. The tactic then replaces all occurrences of the terms
-   given in the conclusion of the goal by their normal forms. If no term
+   the given :token:`one_term`\s. The tactic then replaces all occurrences of the :token:`one_term`\s
+   given in the conclusion of the goal by their normal forms. If no :token:`one_term`
    is given, then the conclusion should be an equation and both
    sides are normalized. The tactic can also be applied in a hypothesis.
+
+   :n:`in @ident`
+     If specified, the tactic performs the simplification in the hypothesis named :token:`ident`.
+
+   .. note::
+
+     :n:`ring_simplify @one_term__1; ring_simplify @one_term__2` is not equivalent to
+     :n:`ring_simplify @one_term__1 @one_term__2`.
+
+     In the latter case the variables map is shared between the two :token:`one_term`\s, and
+     common subterm :g:`t` of :n:`@one_term__1` and :n:`@one_term__2`
+     will have the same associated variable number. So the first
+     alternative should be avoided for :token:`one_term`\s belonging to the same ring
+     theory.
 
    The tactic must be loaded by ``Require Import Ring``. The ring structures
    must be declared with the ``Add Ring`` command (see below). The ring of
@@ -145,31 +166,6 @@ Concrete usage in Coq
          2 * a * b = 30 -> (a + b) ^ 2 = a ^ 2 + b ^ 2 + 30.
     intros a b H; ring [H].
     Abort.
-
-
-.. tacv:: ring [{* @term }] 
- 
-   This tactic decides the equality of two terms modulo ring operations and
-   the equalities defined by the :token:`term`\ s.
-   Each :token:`term` has to be a proof of some equality :g:`m = p`, where :g:`m`
-   is a monomial (after “abstraction”), :g:`p` a polynomial and :g:`=` the
-   corresponding equality of the ring structure.
-
-.. tacv:: ring_simplify [{* @term }] {* @term } in @ident
- 
-   This tactic performs the simplification in the hypothesis named :token:`ident`.
-
-
-.. note:: 
-
-  :n:`ring_simplify @term__1; ring_simplify @term__2` is not equivalent to
-  :n:`ring_simplify @term__1 @term__2`.
-
-  In the latter case the variables map is shared between the two terms, and
-  common subterm :g:`t` of :n:`@term__1` and :n:`@term__2`
-  will have the same associated variable number. So the first
-  alternative should be avoided for terms belonging to the same ring
-  theory.
 
 
 Error messages:
@@ -386,9 +382,9 @@ The syntax for adding a new ring is
       that, given a term, “abstracts” it into an object of type |N| whose
       interpretation via ``Cp_phi`` (the evaluation function of power
       coefficient) is the original term, or returns ``InitialRing.NotConstant``
-      if not a constant coefficient (i.e. |L_tac| is the inverse function of
-      ``Cp_phi``). See files ``plugins/setoid_ring/ZArithRing.v``
-      and ``plugins/setoid_ring/RealField.v`` for examples. By default the tactic
+      if not a constant coefficient (i.e. |Ltac| is the inverse function of
+      ``Cp_phi``). See files ``plugins/ring/ZArithRing.v``
+      and ``plugins/ring/RealField.v`` for examples. By default the tactic
       does not recognize power expressions as ring expressions.
 
    :n:`sign @one_term`
@@ -396,7 +392,7 @@ The syntax for adding a new ring is
       outputting its normal form, i.e writing ``x − y`` instead of ``x + (− y)``. The
       term :token:`term` is a proof that a given sign function indicates expressions
       that are signed (:token:`term` has to be a proof of ``Ring_theory.get_sign``). See
-      ``plugins/setoid_ring/InitialRing.v`` for examples of sign function.
+      ``plugins/ring/InitialRing.v`` for examples of sign function.
 
    :n:`div @one_term`
       allows :tacn:`ring` and :tacn:`ring_simplify` to use monomials with
@@ -405,7 +401,7 @@ The syntax for adding a new ring is
       euclidean division function (:n:`@one_term` has to be a proof of
       ``Ring_theory.div_theory``). For example, this function is called when
       trying to rewrite :math:`7x` by :math:`2x = z` to tell that :math:`7 = 3 \times 2 + 1`. See
-      ``plugins/setoid_ring/InitialRing.v`` for examples of div function.
+      ``plugins/ring/InitialRing.v`` for examples of div function.
 
    :n:`closed [ {+ @qualid } ]`
       to be documented
@@ -433,7 +429,7 @@ How does it work?
 
 The code of ``ring`` is a good example of a tactic written using *reflection*.
 What is reflection? Basically, using it means that a part of a tactic is written
-in Gallina, Coq's language of terms, rather than |Ltac| or |OCaml|. From the
+in Gallina, Coq's language of terms, rather than |Ltac| or OCaml. From the
 philosophical point of view, reflection is using the ability of the Calculus of
 Constructions to speak and reason about itself. For the ``ring`` tactic we used
 Coq as a programming language and also as a proof environment to build a tactic
@@ -495,7 +491,7 @@ its correctness w.r.t interpretation, that is:
 
 So now, what is the scheme for a normalization proof? Let p be the
 polynomial expression that the user wants to normalize. First a little
-piece of |ML| code guesses the type of `p`, the ring theory `T` to use, an
+piece of ML code guesses the type of `p`, the ring theory `T` to use, an
 abstract polynomial `ap` and a variables map `v` such that `p` is |bdi|-
 equivalent to `(PEeval v ap)`. Then we replace it by `(Pphi_dev v (norm ap))`,
 using the main correctness theorem and we reduce it to a
@@ -515,14 +511,26 @@ application of the main correctness theorem to well-chosen arguments.
 Dealing with fields
 ------------------------
 
-.. tacn:: field {? [ {+ @term } ] }
+.. tacn:: field {? [ {+ @one_term } ] }
 
-   This tactic is an extension of the :tacn:`ring` tactic that deals with rational
+   An extension of the :tacn:`ring` tactic that deals with rational
    expressions. Given a rational expression :math:`F = 0`. It first reduces the
    expression `F` to a common denominator :math:`N/D = 0` where `N` and `D`
    are two ring expressions. For example, if we take :math:`F = (1 − 1/x) x − x + 1`, this
    gives :math:`N = (x − 1) x − x^2 + x` and :math:`D = x`. It then calls ring to solve
    :math:`N = 0`.
+
+   :n:`[ {+ @one_term } ]`
+     If specified, the tactic decides the equality of two terms modulo
+     field operations and the equalities defined
+     by the :token:`one_term`\s. Each :token:`one_term` has to be a proof of some equality
+     :g:`m = p`, where :g:`m` is a monomial (after “abstraction”), :g:`p` a polynomial
+     and :g:`=` the corresponding equality of the field structure.
+
+  .. note::
+
+     Rewriting works with the equality  :g:`m = p` only if :g:`p` is a polynomial since
+     rewriting is handled by the underlying ring tactic.
 
    Note that :n:`field` also generates nonzero conditions for all the
    denominators it encounters in the reduction. In our example, it
@@ -538,7 +546,7 @@ Dealing with fields
    The tactic must be loaded by ``Require Import Field``. New field
    structures can be declared to the system with the ``Add Field`` command
    (see below). The field of real numbers is defined in module ``RealField``
-   (in ``plugins/setoid_ring``). It is exported by module ``Rbase``, so
+   (in ``plugins/ring``). It is exported by module ``Rbase``, so
    that requiring ``Rbase`` or ``Reals`` is enough to use the field tactics on
    real numbers. Rational numbers in canonical form are also declared as
    a field in the module ``Qcanon``.
@@ -559,71 +567,49 @@ Dealing with fields
     intros x y H H1; field [H1]; auto.
     Abort.
 
-.. tacv:: field [{* @term}] 
 
-   This tactic decides the equality of two terms modulo
-   field operations and the equalities defined
-   by the :token:`term`\s. Each :token:`term` has to be a proof of some equality
-   :g:`m = p`, where :g:`m` is a monomial (after “abstraction”), :g:`p` a polynomial
-   and :g:`=` the corresponding equality of the field structure.
+.. example:: :tacn:`field` that generates side goals
 
-.. note:: 
+   .. coqtop:: reset all
 
-   Rewriting works with the equality  :g:`m = p` only if :g:`p` is a polynomial since
-   rewriting is handled by the underlying ring tactic.
+      Require Import Reals.
+      Goal forall x y:R,
+      (x * y > 0)%R ->
+      (x * (1 / x + x / (x + y)))%R =
+      ((- 1 / y) * y * (- x * (x / (x + y)) - 1))%R.
 
-.. tacn:: field_simplify {? [ {+ @term } ] } {+ @term } {? in @ident }
+      intros; field.
+
+.. tacn:: field_simplify {? [ {+ @one_term__eq } ] } {+ @one_term } {? in @ident }
  
-   performs the simplification in the conclusion of the
+   Performs the simplification in the conclusion of the
    goal, :math:`F_1 = F_2` becomes :math:`N_1 / D_1 = N_2 / D_2`. A normalization step
    (the same as the one for rings) is then applied to :math:`N_1`, :math:`D_1`, 
    :math:`N_2` and :math:`D_2`. This way, polynomials remain in factorized form during
    fraction simplification. This yields smaller expressions when
    reducing to the same denominator since common factors can be canceled.
 
-.. tacv:: field_simplify [{* @term }] 
+   :n:`[ {+ @one_term__eq } ]`
+     Do simplification in the conclusion of the goal using the equalities
+     defined by these :token:`one_term`\s.
 
-   This variant performs the simplification in the conclusion of the goal using the equalities
-   defined by the :token:`term`\s.
+   :n:`{+ @one_term }`
+     Terms to simplify in the conclusion.
 
-.. tacv:: field_simplify [{* @term }] {* @term }
+   :n:`in @ident`
+     If specified, substitute in the hypothesis :n:`@ident` instead of the conclusion.
 
-   This variant performs the simplification in the terms :token:`term`\s  of the conclusion of the goal
-   using the equalities defined by :token:`term`\s inside the brackets.
+.. tacn:: field_simplify_eq {? [ {+ @one_term } ] } {? in @ident }
 
-.. tacv:: field_simplify in @ident
+   Performs the simplification in the conclusion of
+   the goal, removing the denominator. :math:`F_1 = F_2` becomes :math:`N_1 D_2 = N_2 D_1`.
 
-   This variant performs the simplification in the assumption :token:`ident`.
+   :n:`[ {+ @one_term } ]`
+     Do simplification in the conclusion of the goal using the equalities
+     defined by these :token:`one_term`\s.
 
-.. tacv:: field_simplify [{* @term }] in @ident
- 
-   This variant performs the simplification
-   in the assumption :token:`ident` using the equalities defined by the :token:`term`\s.
-
-.. tacv:: field_simplify [{* @term }] {* @term } in @ident
-
-   This variant performs the simplification in the :token:`term`\s of the
-   assumption :token:`ident` using the
-   equalities defined by the :token:`term`\s inside the brackets.
-
-.. tacn:: field_simplify_eq {? [ {+ @term } ] } {? in @ident }
-
-   performs the simplification in the conclusion of
-   the goal removing the denominator. :math:`F_1 = F_2` becomes :math:`N_1 D_2 = N_2 D_1`.
-
-.. tacv:: field_simplify_eq [ {* @term }]
-
-   This variant performs the simplification in
-   the conclusion of the goal using the equalities defined by :token:`term`\s.
-
-.. tacv:: field_simplify_eq in @ident
-
-   This variant performs the simplification in the assumption :token:`ident`.
-
-.. tacv:: field_simplify_eq [{* @term}] in @ident
-
-   This variant performs the simplification in the assumption :token:`ident`
-   using the equalities defined by :token:`term`\s and removing the denominator.
+   :n:`in @ident`
+     If specified, simplify in the hypothesis :n:`@ident` instead of the conclusion.
 
 
 Adding a new field structure
@@ -704,9 +690,9 @@ History of ring
 
 First Samuel Boutin designed the tactic ``ACDSimpl``. This tactic did lot
 of rewriting. But the proofs terms generated by rewriting were too big
-for |Coq|’s type checker. Let us see why:
+for Coq’s type checker. Let us see why:
 
-.. coqtop:: all
+.. coqtop:: reset all
 
   Require Import ZArith.
   Open Scope Z_scope.
@@ -724,7 +710,7 @@ was rewritten by Patrick Loiseleur: the new tactic does not any
 more require ``ACDSimpl`` to compile and it makes use of |bdi|-reduction not
 only to replace the rewriting steps, but also to achieve the
 interleaving of computation and reasoning (see :ref:`discussion_reflection`). He also wrote
-some |ML| code for the ``Add Ring`` command that allows registering new rings dynamically.
+some ML code for the ``Add Ring`` command that allows registering new rings dynamically.
 
 Proofs terms generated by ring are quite small, they are linear in the
 number of :math:`\oplus` and :math:`\otimes` operations in the normalized terms. Type checking
@@ -767,12 +753,12 @@ tactics using reflection.
 
 Another idea suggested by Benjamin Werner: reflection could be used to
 couple an external tool (a rewriting program or a model checker)
-with |Coq|. We define (in |Coq|) a type of terms, a type of *traces*, and
+with Coq. We define (in Coq) a type of terms, a type of *traces*, and
 prove a correctness theorem that states that *replaying traces* is safe
 with respect to some interpretation. Then we let the external tool do every
 computation (using side-effects, backtracking, exception, or others
 features that are not available in pure lambda calculus) to produce
-the trace. Now we can check in |Coq| that the trace has the expected
+the trace. Now we can check in Coq that the trace has the expected
 semantics by applying the correctness theorem.
 
 

@@ -37,7 +37,6 @@ val dummy_lazy_val : unit -> lazy_val
 (** Linking information for the native compiler *)
 type link_info =
   | Linked of string
-  | LinkedInteractive of string
   | NotLinked
 
 type key = int CEphemeron.key option ref
@@ -90,7 +89,6 @@ type env = private {
   env_typing_flags  : typing_flags;
   retroknowledge : Retroknowledge.retroknowledge;
   indirect_pterms : Opaqueproof.opaquetab;
-  native_symbols : Nativevalues.symbols DPmap.t;
 }
 
 val oracle : env -> Conv_oracle.oracle
@@ -122,6 +120,7 @@ val indices_matter : env -> bool
 
 val is_impredicative_sort : env -> Sorts.t -> bool
 val is_impredicative_univ : env -> Univ.Universe.t -> bool
+val is_impredicative_family : env -> Sorts.family -> bool
 
 (** is the local context empty *)
 val empty_context : env -> bool
@@ -250,6 +249,8 @@ val constant_opt_value_in : env -> Constant.t puniverses -> constr option
 
 val is_primitive : env -> Constant.t -> bool
 
+val is_array_type : env -> Constant.t -> bool
+
 (** {6 Primitive projections} *)
 
 (** Checks that the number of parameters is correct. *)
@@ -282,6 +283,32 @@ val type_in_type_ind : inductive -> env -> bool
 val template_polymorphic_ind : inductive -> env -> bool
 val template_polymorphic_variables : inductive -> env -> Univ.Level.t list
 val template_polymorphic_pind : pinductive -> env -> bool
+
+(** {6 Name quotients} *)
+
+module type QNameS =
+sig
+  type t
+  val equal : env -> t -> t -> bool
+  val compare : env -> t -> t -> int
+  val hash : env -> t -> int
+end
+
+module QConstant : QNameS with type t = Constant.t
+
+module QMutInd : QNameS with type t = MutInd.t
+
+module QInd : QNameS with type t = Ind.t
+
+module QConstruct : QNameS with type t = Construct.t
+
+module QProjection :
+sig
+  include QNameS with type t = Projection.t
+  module Repr : QNameS with type t = Projection.Repr.t
+end
+
+module QGlobRef : QNameS with type t = GlobRef.t
 
 (** {5 Modules } *)
 
@@ -320,6 +347,7 @@ val push_subgraph : Univ.ContextSet.t -> env -> env
 val set_engagement : engagement -> env -> env
 val set_typing_flags : typing_flags -> env -> env
 val set_cumulative_sprop : bool -> env -> env
+val set_type_in_type : bool -> env -> env
 val set_allow_sprop : bool -> env -> env
 val sprop_allowed : env -> bool
 
@@ -386,6 +414,3 @@ val no_link_info : link_info
 
 (** Primitives *)
 val set_retroknowledge : env -> Retroknowledge.retroknowledge -> env
-
-val set_native_symbols : env -> Nativevalues.symbols DPmap.t -> env
-val add_native_symbols : DirPath.t -> Nativevalues.symbols -> env -> env

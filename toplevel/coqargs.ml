@@ -266,8 +266,7 @@ let get_compat_file = function
   | "8.13" -> "Coq.Compat.Coq813"
   | "8.12" -> "Coq.Compat.Coq812"
   | "8.11" -> "Coq.Compat.Coq811"
-  | "8.10" -> "Coq.Compat.Coq810"
-  | ("8.9" | "8.8" | "8.7" | "8.6" | "8.5" | "8.4" | "8.3" | "8.2" | "8.1" | "8.0") as s ->
+  | ("8.10" | "8.9" | "8.8" | "8.7" | "8.6" | "8.5" | "8.4" | "8.3" | "8.2" | "8.1" | "8.0") as s ->
     CErrors.user_err ~hdr:"get_compat_file"
       Pp.(str "Compatibility with version " ++ str s ++ str " not supported.")
   | s ->
@@ -508,6 +507,7 @@ let parse_args ~help ~init arglist : t * string list =
     |"-color" -> set_color oval (next ())
     |"-config"|"--config" -> set_query oval PrintConfig
     |"-debug" -> Coqinit.set_debug (); oval
+    |"-xml-debug" -> Flags.xml_debug := true; Coqinit.set_debug (); oval
     |"-diffs" ->
       add_set_option oval Proof_diffs.opt_name @@ Stm.OptionSet (Some (next ()))
     |"-stm-debug" -> Stm.stm_debug := true; oval

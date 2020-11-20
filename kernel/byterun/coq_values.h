@@ -17,7 +17,6 @@
 #include <float.h>
 
 #define Default_tag 0
-#define Accu_tag 0
 
 #define ATOM_ID_TAG 0
 #define ATOM_INDUCTIVE_TAG 1
@@ -28,14 +27,8 @@
 #define ATOM_COFIX_TAG 6
 #define ATOM_COFIXEVALUATED_TAG 7
 
-/* Les blocs accumulate */
-#define Is_accu(v) (Is_block(v) && (Tag_val(v) == Accu_tag))
-#define IS_EVALUATED_COFIX(v) (Is_accu(v) && Is_block(Field(v,1)) && (Tag_val(Field(v,1)) == ATOM_COFIXEVALUATED_TAG))
 #define Is_double(v) (Tag_val(v) == Double_tag)
 #define Is_tailrec_switch(v) (Field(v,1) == Val_true)
-
-/* coq array */
-#define Is_coq_array(v) (Is_block(v) && (Wosize_val(v) == 1))
 
 /* coq values for primitive operations */
 #define coq_tag_C1 2

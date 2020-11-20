@@ -23,12 +23,11 @@ let my_int_of_string ?loc s =
   with Failure _ ->
     CErrors.user_err ?loc (Pp.str "This number is too large.")
 
-let my_to_nat_string ?loc ispos s =
+let my_to_nat_string ?loc s =
   match NumTok.Unsigned.to_nat s with
   | Some n -> n
   | None ->
-    let pos = if ispos then "a natural" else "an integer" in
-    CErrors.user_err ?loc Pp.(str "This number is not " ++ str pos ++ str " number.")
+    CErrors.user_err ?loc Pp.(str "This number is not an integer.")
 
 let test_pipe_closedcurly =
   let open Pcoq.Lookahead in
@@ -46,9 +45,9 @@ let test_minus_nat =
 
 GRAMMAR EXTEND Gram
   GLOBAL:
-    bignat bigint natural integer identref name ident var preident
+    bignat bigint natural integer identref name ident hyp preident
     fullyqualid qualid reference dirpath ne_lstring
-    ne_string string lstring pattern_ident pattern_identref by_notation
+    ne_string string lstring pattern_ident by_notation
     smart_global bar_cbrace strategy_level;
   preident:
     [ [ s = IDENT -> { s } ] ]
@@ -57,16 +56,13 @@ GRAMMAR EXTEND Gram
     [ [ s = IDENT -> { Id.of_string s } ] ]
   ;
   pattern_ident:
-    [ [ LEFTQMARK; id = ident -> { id } ] ]
-  ;
-  pattern_identref:
-    [ [ id = pattern_ident -> { CAst.make ~loc id } ] ]
-  ;
-  var: (* as identref, but interpret as a term identifier in ltac *)
-    [ [ id = ident -> { CAst.make ~loc id } ] ]
+    [ [ LEFTQMARK; id = ident -> { CAst.make ~loc id } ] ]
   ;
   identref:
     [ [ id = ident -> { CAst.make ~loc id } ] ]
+  ;
+  hyp: (* as identref, but interpreted as an hypothesis in tactic notations *)
+    [ [ id = identref -> { id } ] ]
   ;
   field:
     [ [ s = FIELD -> { Id.of_string s } ] ]
@@ -127,12 +123,12 @@ GRAMMAR EXTEND Gram
     [ [ i = bignat -> { my_int_of_string ~loc i } ] ]
   ;
   bigint:
-    [ [ i = NUMERAL -> { my_to_nat_string true ~loc i }
-      | test_minus_nat; "-"; i = NUMERAL -> { "-" ^ my_to_nat_string ~loc false i } ] ]
+    [ [ i = bignat -> { i }
+      | test_minus_nat; "-"; i = bignat -> { "-" ^ i } ] ]
   ;
   bignat:
-    [ [ i = NUMERAL -> { my_to_nat_string ~loc true i } ] ]
- ;
+    [ [ i = NUMBER -> { my_to_nat_string ~loc i } ] ]
+  ;
   bar_cbrace:
     [ [ test_pipe_closedcurly; "|"; "}" -> { () } ] ]
   ;

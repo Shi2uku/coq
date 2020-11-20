@@ -13,12 +13,12 @@ Introduction
 This chapter describes a set of tactics known as |SSR| originally
 designed to provide support for the so-called *small scale reflection*
 proof methodology. Despite the original purpose this set of tactic is
-of general interest and is available in |Coq| starting from version 8.7.
+of general interest and is available in Coq starting from version 8.7.
 
 |SSR| was developed independently of the tactics described in
 Chapter :ref:`tactics`. Indeed the scope of the tactics part of |SSR| largely
 overlaps with the standard set of tactics. Eventually the overlap will
-be reduced in future releases of |Coq|.
+be reduced in future releases of Coq.
 
 Proofs written in |SSR| typically look quite different from the
 ones written using only tactics as per Chapter :ref:`tactics`. We try to
@@ -112,7 +112,7 @@ Compatibility issues
 ~~~~~~~~~~~~~~~~~~~~
 
 Requiring the above modules creates an environment which is mostly
-compatible with the rest of |Coq|, up to a few discrepancies:
+compatible with the rest of Coq, up to a few discrepancies:
 
 
 + New keywords (``is``) might clash with variable, constant, tactic or
@@ -124,11 +124,11 @@ compatible with the rest of |Coq|, up to a few discrepancies:
 + Identifiers with both leading and trailing ``_``, such as ``_x_``, are
   reserved by |SSR| and cannot appear in scripts.
 + The extensions to the :tacn:`rewrite` tactic are partly incompatible with those
-  available in current versions of |Coq|; in particular: ``rewrite .. in
+  available in current versions of Coq; in particular: ``rewrite .. in
   (type of k)`` or ``rewrite .. in *`` or any other variant of :tacn:`rewrite`
   will not work, and the |SSR| syntax and semantics for occurrence selection
   and rule chaining is different. Use an explicit rewrite direction
-  (``rewrite <- …`` or ``rewrite -> …``) to access the |Coq| rewrite tactic.
+  (``rewrite <- …`` or ``rewrite -> …``) to access the Coq rewrite tactic.
 + New symbols (``//``, ``/=``, ``//=``) might clash with adjacent
   existing symbols.
   This can be avoided by inserting white spaces.
@@ -176,16 +176,16 @@ compatible with the rest of |Coq|, up to a few discrepancies:
    create such identifiers.  Disabling the flag generates a warning instead,
    increasing compatibility with other parts of Coq.
 
-|Gallina| extensions
+Gallina extensions
 --------------------
 
 Small-scale reflection makes an extensive use of the programming
-subset of |Gallina|, |Coq|’s logical specification language. This subset
+subset of Gallina, Coq’s logical specification language. This subset
 is quite suited to the description of functions on representations,
 because it closely follows the well-established design of the ML
 programming language. The |SSR| extension provides three additions
-to |Gallina|, for pattern assignment, pattern testing, and polymorphism;
-these mitigate minor but annoying discrepancies between |Gallina| and
+to Gallina, for pattern assignment, pattern testing, and polymorphism;
+these mitigate minor but annoying discrepancies between Gallina and
 ML.
 
 
@@ -199,7 +199,7 @@ irrefutable pattern matching, that is, destructuring assignment:
    term += let: @pattern := @term in @term
 
 Note the colon ``:`` after the ``let`` keyword, which avoids any ambiguity
-with a function definition or |Coq|’s basic destructuring let. The let:
+with a function definition or Coq’s basic destructuring let. The let:
 construct differs from the latter in that
 
 
@@ -237,7 +237,7 @@ construct differs from the latter in that
 
 
 The ``let:`` construct is just (more legible) notation for the primitive
-|Gallina| expression :n:`match @term with @pattern => @term end`.
+Gallina expression :n:`match @term with @pattern => @term end`.
 
 The |SSR| destructuring assignment supports all the dependent
 match annotations; the full syntax is
@@ -294,10 +294,10 @@ example, the null and all list function(al)s can be defined as follows:
 
 The pattern conditional also provides a notation for destructuring
 assignment with a refutable pattern, adapted to the pure functional
-setting of |Gallina|, which lacks a ``Match_Failure`` exception.
+setting of Gallina, which lacks a ``Match_Failure`` exception.
 
 Like ``let:`` above, the ``if…is`` construct is just (more legible) notation
-for the primitive |Gallina| expression
+for the primitive Gallina expression
 :n:`match @term with @pattern => @term | _ => @term end`.
 
 Similarly, it will always be displayed as the expansion of this form
@@ -355,15 +355,15 @@ Note that :token:`pattern` eventually binds variables in the third
 Parametric polymorphism
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Unlike ML, polymorphism in core |Gallina| is explicit: the type
+Unlike ML, polymorphism in core Gallina is explicit: the type
 parameters of polymorphic functions must be declared explicitly, and
-supplied at each point of use. However, |Coq| provides two features to
+supplied at each point of use. However, Coq provides two features to
 suppress redundant parameters:
 
 
 + Sections are used to provide (possibly implicit) parameters for a
   set of definitions.
-+ Implicit arguments declarations are used to tell |Coq| to use type
++ Implicit arguments declarations are used to tell Coq to use type
   inference to deduce some parameters from the context at each point of
   call.
 
@@ -392,11 +392,11 @@ expressions such as
       Definition all_null (s : list T) := all (@null T) s.
 
 Unfortunately, such higher-order expressions are quite frequent in
-representation functions, especially those which use |Coq|'s
+representation functions, especially those which use Coq's
 ``Structures`` to emulate Haskell typeclasses.
 
-Therefore, |SSR| provides a variant of |Coq|’s implicit argument
-declaration, which causes |Coq| to fill in some implicit parameters at
+Therefore, |SSR| provides a variant of Coq’s implicit argument
+declaration, which causes Coq to fill in some implicit parameters at
 each point of use, e.g., the above definition can be written:
 
 .. example::
@@ -432,7 +432,7 @@ The syntax of the new declaration is
 
    As these prenex implicit arguments are ubiquitous and have often large
    display strings, it is strongly recommended to change the default
-   display settings of |Coq| so that they are not printed (except after
+   display settings of Coq so that they are not printed (except after
    a ``Set Printing All`` command). All |SSR| library files thus start
    with the incantation
 
@@ -617,7 +617,7 @@ Abbreviations
      selected occurrences of a term.
 
 .. prodn::
-   occ_switch ::= { {? {| + | - } } {* @num } }
+   occ_switch ::= { {? {| + | - } } {* @natural } }
 
 where:
 
@@ -957,7 +957,7 @@ context. This is essential in the context of an interactive
 development environment (IDE), because it facilitates navigating the
 proof, allowing to instantly "jump back" to the point at which a
 questionable assumption was added, and to find relevant assumptions by
-browsing the pruned context. While novice or casual |Coq| users may find
+browsing the pruned context. While novice or casual Coq users may find
 the automatic name selection feature convenient, the usage of such a
 feature severely undermines the readability and maintainability of
 proof scripts, much like automatic variable declaration in programming
@@ -973,7 +973,7 @@ the foundation of the |SSR| proof language.
 Bookkeeping
 ~~~~~~~~~~~
 
-During the course of a proof |Coq| always present the user with a
+During the course of a proof Coq always present the user with a
 *sequent* whose general form is::
 
   ci : Ti
@@ -1015,7 +1015,7 @@ are *ordered*, but *unnamed*: the display names of variables may
 change at any time because of α-conversion.
 
 Similarly, basic deductive steps such as apply can only operate on the
-goal because the |Gallina| terms that control their action (e.g., the
+goal because the Gallina terms that control their action (e.g., the
 type of the lemma used by ``apply``) only provide unnamed bound variables.
 [#2]_ Since the proof script can only refer directly to the context, it
 must constantly shift declarations from the goal to the context and
@@ -1083,7 +1083,7 @@ simultaneously renames ``m`` and ``le_m_n`` into ``p`` and ``le_n_p``,
 respectively, by first turning them into unnamed variables, then
 turning these variables back into constants and facts.
 
-Furthermore, |SSR| redefines the basic |Coq| tactics ``case``, ``elim``,
+Furthermore, |SSR| redefines the basic Coq tactics ``case``, ``elim``,
 and ``apply`` so that they can take better advantage of
 ``:`` and ``=>``. In there
 |SSR| variants, these tactic operate on the first variable or
@@ -1421,7 +1421,7 @@ Therefore this tactic changes any goal ``G`` into
 
    forall n n0 : nat, n = n0 -> G.
 
-where the name ``n0`` is picked by the |Coq| display function, and assuming
+where the name ``n0`` is picked by the Coq display function, and assuming
 ``n`` appeared only in ``G``.
 
 Finally, note that a discharge operation generalizes defined constants
@@ -1580,7 +1580,7 @@ whose general syntax is
    i_pattern ::= {| @ident | > | _ | ? | * | + | {? @occ_switch } {| -> | <- } | [ {?| @i_item } ] | - | [: {+ @ident } ] }
 
 .. prodn::
-   i_block ::= {| [^ @ident ] | [^~ {| @ident | @num } ] }
+   i_block ::= {| [^ @ident ] | [^~ {| @ident | @natural } ] }
 
 The ``=>`` tactical first executes :token:`tactic`, then the :token:`i_item`\s,
 left to right. An :token:`s_item` specifies a
@@ -1647,7 +1647,10 @@ Notations can be used to name tactics,  for example
    Notation "'myop'" := (ltac:(my ltac code)) : ssripat_scope.
 
 lets one write just ``/myop`` in the intro pattern. Note the scope
-annotation: views are interpreted opening the ``ssripat`` scope.
+annotation: views are interpreted opening the ``ssripat`` scope.  We
+provide the following ltac views: ``/[dup]`` to duplicate the top of
+the stack, ``/[swap]`` to swap the two first elements and ``/[apply]``
+to apply the top of the stack to the next.
 
 Intro patterns
 ``````````````
@@ -1842,8 +1845,8 @@ Block introduction
 
 :n:`[^~ @ident ]`
   *block destructing* using :token:`ident` as a suffix.
-:n:`[^~ @num ]`
-  *block destructing* using :token:`num` as a suffix.
+:n:`[^~ @natural ]`
+  *block destructing* using :token:`natural` as a suffix.
 
   Only a :token:`s_item` is allowed between the elimination tactic and
   the block destructing.
@@ -1927,7 +1930,7 @@ When the top assumption of a goal has an inductive type, two specific
 operations are possible: the case analysis performed by the :tacn:`case`
 tactic, and the application of an induction principle, performed by
 the :tacn:`elim` tactic. When this top assumption has an inductive type, which
-is moreover an instance of a type family, |Coq| may need help from the
+is moreover an instance of a type family, Coq may need help from the
 user to specify which occurrences of the parameters of the type should
 be substituted.
 
@@ -2055,7 +2058,7 @@ Control flow
 Indentation and bullets
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-A linear development of |Coq| scripts gives little information on the
+A linear development of Coq scripts gives little information on the
 structure of the proof. In addition, replaying a proof after some
 changes in the statement to be proved will usually not display
 information to distinguish between the various branches of case
@@ -2236,17 +2239,17 @@ tactics to *permute* the subgoals generated by a tactic.
 
    These two equivalent tactics invert the order of the subgoals in focus.
 
-   .. tacv:: last @num first
+   .. tacv:: last @natural first
 
-      If :token:`num`\'s value is :math:`k`,
+      If :token:`natural`\'s value is :math:`k`,
       this tactic rotates the :math:`n` subgoals :math:`G_1` , …, :math:`G_n`
       in focus. Subgoal :math:`G_{n + 1 − k}` becomes the first, and the
       circular order of subgoals remains unchanged.
 
-   .. tacn:: first @num last
+   .. tacn:: first @natural last
       :name: first (ssreflect)
 
-      If :token:`num`\'s value is :math:`k`,
+      If :token:`natural`\'s value is :math:`k`,
       this tactic rotates the :math:`n` subgoals :math:`G_1` , …, :math:`G_n`
       in focus. Subgoal :math:`G_{k + 1 \bmod n}` becomes the first, and the circular order
       of subgoals remains unchanged.
@@ -2319,7 +2322,7 @@ tactic should be repeated on the current subgoal.
 There are four kinds of multipliers:
 
 .. prodn::
-   mult ::= {| @num ! | ! | @num ? | ? }
+   mult ::= {| @natural ! | ! | @natural ? | ? }
 
 Their meaning is:
 
@@ -3391,7 +3394,7 @@ rewrite operations prescribed by the rules on the current goal.
 
   Indeed rule ``eqab`` is the first to apply among the ones
   gathered in the tuple passed to the rewrite tactic. This multirule
-  ``(eqab, eqac)`` is actually a |Coq| term and we can name it with a
+  ``(eqab, eqac)`` is actually a Coq term and we can name it with a
   definition:
 
   .. coqtop:: all
@@ -3529,11 +3532,11 @@ Anyway this tactic is *not* equivalent to
   lemma that was used, while the latter requires you prove the quantified
   form.
 
-When |SSR| rewrite fails on standard |Coq| licit rewrite
+When |SSR| rewrite fails on standard Coq licit rewrite
 ````````````````````````````````````````````````````````
 
 In a few cases, the |SSR| rewrite tactic fails rewriting some
-redexes which standard |Coq| successfully rewrites. There are two main
+redexes which standard Coq successfully rewrites. There are two main
 cases:
 
 
@@ -3550,7 +3553,7 @@ cases:
 
      Lemma fubar (x : unit) : (let u := x in u) = tt.
 
-+ The standard rewrite tactic provided by |Coq| uses a different algorithm
++ The standard rewrite tactic provided by Coq uses a different algorithm
   to find instances of the rewrite rule.
 
   .. example::
@@ -3953,7 +3956,7 @@ together with “term tagging” operations.
 
 The first one uses auxiliary definitions to introduce a provably equal
 copy of any term t. However this copy is (on purpose) *not
-convertible* to t in the |Coq| system [#8]_. The job is done by the
+convertible* to t in the Coq system [#8]_. The job is done by the
 following construction:
 
 .. coqdoc::
@@ -4086,7 +4089,7 @@ will generally fail to perform congruence simplification, even on
 rather simple cases. We therefore provide a more robust alternative in
 which the function is supplied:
 
-.. tacn:: congr {? @num } @term
+.. tacn:: congr {? @natural } @term
    :name: congr
 
    This tactic:
@@ -4120,7 +4123,7 @@ which the function is supplied:
          Lemma test (x y z : nat) : x = y -> x = z.
          congr (_ = _).
 
-   The optional :token:`num` forces the number of arguments for which the
+   The optional :token:`natural` forces the number of arguments for which the
    tactic should generate equality proof obligations.
 
    This tactic supports equalities between applications with dependent
@@ -4542,7 +4545,7 @@ is a synonym for:
    elim x using V; clear x; intro y.
 
 where ``x`` is a variable in the context, ``y`` a fresh name and ``V``
-any second order lemma; |SSR| relaxes the syntactic restrictions of the |Coq|
+any second order lemma; |SSR| relaxes the syntactic restrictions of the Coq
 ``elim``. The first pattern following ``:`` can be a ``_`` wildcard if the
 conclusion of the view ``V`` specifies a pattern for its last argument
 (e.g., if ``V`` is a functional induction lemma generated by the
@@ -4590,7 +4593,7 @@ generation (see section :ref:`generation_of_equations_ssr`).
      elim/last_ind_list E : l=> [| u v]; last first.
 
 
-User-provided eliminators (potentially generated with |Coq|’s ``Function``
+User-provided eliminators (potentially generated with Coq’s ``Function``
 command) can be combined with the type family switches described
 in section :ref:`type_families_ssr`.
 Consider an eliminator ``foo_ind`` of type:
@@ -4982,8 +4985,8 @@ distinction between logical propositions and boolean values. On the
 one hand, logical propositions are objects of *sort* ``Prop`` which is
 the carrier of intuitionistic reasoning. Logical connectives in
 ``Prop`` are *types*, which give precise information on the structure
-of their proofs; this information is automatically exploited by |Coq|
-tactics.  For example, |Coq| knows that a proof of ``A \/ B`` is
+of their proofs; this information is automatically exploited by Coq
+tactics.  For example, Coq knows that a proof of ``A \/ B`` is
 either a proof of ``A`` or a proof of ``B``.  The tactics ``left`` and
 ``right`` change the goal ``A \/ B`` to ``A`` and ``B``, respectively;
 dually, the tactic ``case`` reduces the goal ``A \/ B => G`` to two
@@ -5042,7 +5045,7 @@ mechanism:
 
    Coercion is_true (b : bool) := b = true.
 
-This allows any boolean formula ``b`` to be used in a context where |Coq|
+This allows any boolean formula ``b`` to be used in a context where Coq
 would expect a proposition, e.g., after ``Lemma … :``. It is then
 interpreted as ``(is_true b)``, i.e., the proposition ``b = true``. Coercions
 are elided by the pretty-printer, so they are essentially transparent
@@ -5077,9 +5080,9 @@ proposition ``b1 /\ b2`` hides two coercions. The conjunction of
 
 Expressing logical equivalences through this family of inductive types
 makes possible to take benefit from *rewritable equations* associated
-to the case analysis of |Coq|’s inductive types.
+to the case analysis of Coq’s inductive types.
 
-Since the equivalence predicate is defined in |Coq| as:
+Since the equivalence predicate is defined in Coq as:
 
 .. coqdoc::
 
@@ -5392,8 +5395,8 @@ In this context, the identity view can be used when no view has to be applied:
 Declaring new Hint Views
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. cmd:: Hint View for move / @ident {? | @num }
-         Hint View for apply / @ident {? | @num }
+.. cmd:: Hint View for move / @ident {? | @natural }
+         Hint View for apply / @ident {? | @natural }
 
    This command can be used to extend the database of hints for the view
    mechanism.
@@ -5410,7 +5413,7 @@ Declaring new Hint Views
    views. The optional natural number is the number of implicit
    arguments to be considered for the declared hint view lemma.
 
-   .. cmdv:: Hint View for apply//@ident {? | @num }
+   .. cmdv:: Hint View for apply//@ident {? | @natural }
 
       This variant with a double slash ``//``, declares hint views for right
       hand sides of double views.
@@ -5571,9 +5574,9 @@ Module name
 
 Natural number
 
-.. prodn:: natural ::= {| @num | @ident }
+.. prodn:: nat_or_ident ::= {| @natural | @ident }
 
-where :token:`ident` is an Ltac variable denoting a standard |Coq| numeral
+where :token:`ident` is an Ltac variable denoting a standard Coq number
 (should not be the name of a tactic which can be followed by a
 bracket ``[``, like ``do``, ``have``,…)
 
@@ -5614,19 +5617,19 @@ view :ref:`introduction_ssr`
 intro block :ref:`introduction_ssr`
 
 .. prodn::
-   i_block ::= {| [^ @ident ] | [^~ {| @ident | @num } ] }
+   i_block ::= {| [^ @ident ] | [^~ {| @ident | @natural } ] }
 
 intro item  see :ref:`introduction_ssr`
 
-.. prodn:: int_mult ::= {? @num } @mult_mark
+.. prodn:: int_mult ::= {? @natural } @mult_mark
 
 multiplier  see :ref:`iteration_ssr`
 
-.. prodn:: occ_switch ::= { {? {| + | - } } {* @num } }
+.. prodn:: occ_switch ::= { {? {| + | - } } {* @natural } }
 
 occur. switch see :ref:`occurrence_selection_ssr`
 
-.. prodn:: mult ::= {? @num } @mult_mark
+.. prodn:: mult ::= {? @natural } @mult_mark
 
 multiplier see :ref:`iteration_ssr`
 
@@ -5724,11 +5727,11 @@ respectively.
 
    local function definition
 
-.. tacv:: pose fix @fix_body
+.. tacv:: pose fix @fix_decl
 
    local fix definition
 
-.. tacv:: pose cofix @fix_body
+.. tacv:: pose cofix @fix_decl
 
    local cofix definition
 
@@ -5741,7 +5744,7 @@ respectively.
 
    unlock (see :ref:`locking_ssr`)
 
-.. tacn:: congr {? @num } @term
+.. tacn:: congr {? @natural } @term
 
    congruence (see :ref:`congruence_ssr`)
 
@@ -5765,11 +5768,11 @@ localization see :ref:`localization_ssr`
 
 iteration  see :ref:`iteration_ssr`
 
-.. prodn:: tactic += @tactic ; {| first | last } {? @num } {| @tactic | [ {+| @tactic } ] }
+.. prodn:: tactic += @tactic ; {| first | last } {? @natural } {| @tactic | [ {+| @tactic } ] }
 
 selector  see :ref:`selectors_ssr`
 
-.. prodn:: tactic += @tactic ; {| first | last } {? @num }
+.. prodn:: tactic += @tactic ; {| first | last } {? @natural }
 
 rotation see :ref:`selectors_ssr`
 
@@ -5780,11 +5783,11 @@ closing see :ref:`terminators_ssr`
 Commands
 ~~~~~~~~
 
-.. cmd:: Hint View for {| move | apply } / @ident {? | @num }
+.. cmd:: Hint View for {| move | apply } / @ident {? | @natural }
 
    view hint declaration (see :ref:`declaring_new_hints_ssr`)
 
-.. cmd:: Hint View for apply // @ident {? @num }
+.. cmd:: Hint View for apply // @ident {? @natural }
 
    right hand side double , view hint declaration (see :ref:`declaring_new_hints_ssr`)
 
@@ -5823,6 +5826,6 @@ Settings
 .. [#8] This is an implementation feature: there is no such obstruction
   in the metatheory
 .. [#9] The current state of the proof shall be displayed by the Show
-  Proof command of |Coq| proof mode.
+  Proof command of Coq proof mode.
 .. [#10] A simple proof context entry is a naked identifier (i.e. not between
   parentheses) designating a context entry that is not a section variable.

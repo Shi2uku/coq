@@ -128,7 +128,8 @@ type 'a equation =
       rhs          : 'a rhs;
       alias_stack  : Name.t list;
       eqn_loc      : Loc.t option;
-      used         : bool ref }
+      used         : int ref;
+      catch_all_vars : Id.t CAst.t list ref }
 
 type 'a matrix = 'a equation list
 
@@ -297,7 +298,7 @@ let inductive_template env sigma tmloc ind =
             let ty = EConstr.of_constr ty in
             let ty' = substl subst ty in
             let sigma, e =
-              Evarutil.new_evar env ~src:(hole_source n) ~typeclass_candidate:false sigma ty'
+              Evarutil.new_evar env ~src:(hole_source n) sigma ty'
             in
             (sigma, e::subst,e::evarl,n+1)
         | LocalDef (na,b,ty) ->
@@ -514,7 +515,7 @@ let check_and_adjust_constructor env ind cstrs pat = match DAst.get pat with
       let loc = pat.CAst.loc in
       (* Check it is constructor of the right type *)
       let ind' = inductive_of_constructor cstr in
-      if eq_ind ind' ind then
+      if Ind.CanOrd.equal ind' ind then
         (* Check the constructor has the right number of args *)
         let ci = cstrs.(i-1) in
         let nb_args_constr = ci.cs_nargs in
@@ -543,11 +544,34 @@ let check_all_variables env sigma typ mat =
            error_bad_pattern ?loc env sigma cstr_sp typ)
     mat
 
-let check_unused_pattern env eqn =
-  if not !(eqn.used) then
-    raise_pattern_matching_error ?loc:eqn.eqn_loc (env, Evd.empty, UnusedClause eqn.patterns)
+let set_pattern_catch_all_var ?loc eqn = function
+  | Name id when not (Id.Set.mem id eqn.rhs.rhs_vars) ->
+    eqn.catch_all_vars := CAst.make ?loc id :: !(eqn.catch_all_vars)
+  | _ -> ()
 
-let set_used_pattern eqn = eqn.used := true
+let warn_named_multi_catch_all =
+  CWarnings.create ~name:"unused-pattern-matching-variable" ~category:"pattern-matching"
+         (fun id ->
+          strbrk "Unused variable " ++ Id.print id ++ strbrk " catches more than one case.")
+
+let wildcard_id = Id.of_string "wildcard'"
+
+let is_wildcard id =
+  Id.equal (Id.of_string (Nameops.atompart_of_id id)) wildcard_id
+
+let check_unused_pattern env eqn =
+  match !(eqn.used) with
+  | 0 -> raise_pattern_matching_error ?loc:eqn.eqn_loc (env, Evd.empty, UnusedClause eqn.patterns)
+  | 1 -> ()
+  | _ ->
+    let warn {CAst.v = id; loc} =
+      (* Convention: Names starting with `_` and derivatives of Program's
+         "wildcard'" internal name deactivate the warning *)
+      if (Id.to_string id).[0] <> '_' && not (is_wildcard id)
+      then warn_named_multi_catch_all ?loc id in
+    List.iter warn !(eqn.catch_all_vars)
+
+let set_used_pattern eqn = eqn.used := !(eqn.used) + 1
 
 let extract_rhs pb =
   match pb.mat with
@@ -1017,7 +1041,8 @@ let add_assert_false_case pb tomatch =
               it = None };
       alias_stack = Anonymous::aliasnames;
       eqn_loc = None;
-      used = ref false } ]
+      used = ref 0;
+      catch_all_vars = ref [] } ]
 
 let adjust_impossible_cases sigma pb pred tomatch submat =
   match submat with
@@ -1235,6 +1260,7 @@ let group_equations pb ind current cstrs mat =
                  let args = make_anonymous_patvars cstrs.(i-1).cs_nargs in
                  brs.(i-1) <- (args, name, rest) :: brs.(i-1)
                done;
+               set_pattern_catch_all_var ?loc:pat.CAst.loc eqn name;
                if !only_default == None then only_default := Some true
            | PatCstr (((_,i)),args,name) ->
                (* This is a regular clause *)
@@ -1602,7 +1628,8 @@ let matx_of_eqns env eqns =
     { patterns = initial_lpat;
       alias_stack = [];
       eqn_loc = loc;
-      used = ref false;
+      used = ref 0;
+      catch_all_vars = ref [];
       rhs = rhs }
   in List.map build_eqn eqns
 
@@ -1757,25 +1784,24 @@ let abstract_tycon ?loc env sigma subst tycon extenv t =
   !evdref, ans
 
 let build_tycon ?loc env tycon_env s subst tycon extenv sigma t =
-  let sigma, t, tt = match t with
+  let s = mkSort s in
+  match t with
     | None ->
         (* This is the situation we are building a return predicate and
            we are in an impossible branch *)
         let n = Context.Rel.length (rel_context !!env) in
         let n' = Context.Rel.length (rel_context !!tycon_env) in
-        let sigma, (impossible_case_type, u) =
-          Evarutil.new_type_evar (reset_context !!env) ~src:(Loc.tag ?loc Evar_kinds.ImpossibleCase)
-            sigma univ_flexible_alg
-        in
-        (sigma, lift (n'-n) impossible_case_type, mkSort u)
+        let src = Loc.tag ?loc Evar_kinds.ImpossibleCase in
+        let sigma, impossible_case_type =
+          Evarutil.new_evar (reset_context !!env) sigma ~src ~typeclass_candidate:false s in
+        (sigma, { uj_val = lift (n'-n) impossible_case_type; uj_type = s })
     | Some t ->
         let sigma, t = abstract_tycon ?loc tycon_env sigma subst tycon extenv t in
         let sigma, tt = Typing.type_of !!extenv sigma t in
-        (sigma, t, tt) in
-  match unify_leq_delay !!env sigma tt (mkSort s) with
-  | exception Evarconv.UnableToUnify _ -> anomaly (Pp.str "Build_tycon: should be a type.");
-  | sigma ->
-    sigma, { uj_val = t; uj_type = tt }
+        match unify_leq_delay !!env sigma tt s with
+        | exception Evarconv.UnableToUnify _ -> anomaly (Pp.str "Build_tycon: should be a type.");
+        | sigma -> (sigma, { uj_val = t; uj_type = tt })
+
 
 (* For a multiple pattern-matching problem Xi on t1..tn with return
  * type T, [build_inversion_problem Gamma Sigma (t1..tn) T] builds a return
@@ -1859,7 +1885,8 @@ let build_inversion_problem ~program_mode loc env sigma tms t =
     { patterns = patl;
       alias_stack = [];
       eqn_loc = None;
-      used = ref false;
+      used = ref 0;
+      catch_all_vars = ref [];
       rhs = { rhs_env = pb_env;
               (* we assume all vars are used; in practice we discard dependent
                  vars so that the field rhs_vars is normally not used *)
@@ -1879,16 +1906,32 @@ let build_inversion_problem ~program_mode loc env sigma tms t =
       [ { patterns = List.map (fun _ -> DAst.make @@ PatVar Anonymous) patl;
           alias_stack = [];
           eqn_loc = None;
-          used = ref false;
+          used = ref 0;
+          catch_all_vars = ref [];
           rhs = { rhs_env = pb_env;
                   rhs_vars = Id.Set.empty;
                   avoid_ids = avoid0;
                   it = None } } ] in
   (* [pb] is the auxiliary pattern-matching serving as skeleton for the
       return type of the original problem Xi *)
-  let s' = Retyping.get_sort_of !!env sigma t in
-  let sigma, s = Evd.new_sort_variable univ_flexible sigma in
-  let sigma = Evd.set_leq_sort !!env sigma s' s in
+  let s = Retyping.get_sort_of !!env sigma t in
+  let sigma, s = Sorts.(match s with
+  | SProp | Prop | Set ->
+    (* To anticipate a possible restriction on an elimination from
+       SProp, Prop or (impredicative) Set we preserve the sort of the
+       main branch, knowing that the default impossible case shall
+       always be coercible to one of those *)
+      sigma, s
+  | Type _ ->
+    (* If the sort has algebraic universes, we cannot use this sort a
+       type constraint for the impossible case; especially if the
+       default case is not the canonical one provided in Prop by Coq
+       but one given by the user, which may be in either sort (an
+       example is in Vector.caseS', even if this one can probably be
+       put in Prop too with some care) *)
+    let sigma, s' = Evd.new_sort_variable univ_flexible sigma in
+    let sigma = Evd.set_leq_sort !!env sigma s s' in
+    sigma, s') in
   let pb =
     { env       = pb_env;
       pred      = (*ty *) mkSort s;
@@ -1936,7 +1979,7 @@ let extract_arity_signature ?(dolift=true) env0 tomatchl tmsign =
           let realnal =
             match t with
               | Some {CAst.loc;v=(ind',realnal)} ->
-                  if not (eq_ind ind ind') then
+                  if not (Ind.CanOrd.equal ind ind') then
                     user_err ?loc  (str "Wrong inductive type.");
                   if not (Int.equal nrealargs_ctxt (List.length realnal)) then
                       anomaly (Pp.str "Ill-formed 'in' clause in cases.");
@@ -2037,6 +2080,15 @@ let prepare_predicate_from_arsign_tycon ~program_mode env sigma loc tomatchs ars
         Some (sigma', p, arsign)
   with e when precatchable_exception e -> None
 
+let expected_elimination_sort env tomatchl =
+  List.fold_right (fun (_,tm) s ->
+      match tm with
+      | IsInd (_,IndType(indf,_),_) ->
+        (* Not a degenerated line, see coerce_to_indtype *)
+        let s' = Inductive.elim_sort (Inductive.lookup_mind_specif env (fst (fst (dest_ind_family indf)))) in
+        if Sorts.family_leq s s' then s else s'
+      | NotInd _ -> s) tomatchl Sorts.InType
+
 (* Builds the predicate. If the predicate is dependent, its context is
  * made of 1+nrealargs assumptions for each matched term in an inductive
  * type and 1 assumption for each term not _syntactically_ in an
@@ -2087,8 +2139,12 @@ let prepare_predicate ?loc ~program_mode typing_fun env sigma tomatchs arsign ty
     | Some rtntyp ->
       (* We extract the signature of the arity *)
       let building_arsign,envar = List.fold_right_map (push_rel_context ~hypnaming:KeepUserNameAndRenameExistingButSectionNames sigma) arsign env in
-      let sigma, newt = new_sort_variable univ_flexible sigma in
-      let sigma, predcclj = typing_fun (mk_tycon (mkSort newt)) envar sigma rtntyp in
+      (* We put a type constraint on the predicate so that one
+         branch type-checked first does not lead to a lower type than
+         another branch; we take into account the possible elimination
+         constraints on the predicate *)
+      let sigma, rtnsort = fresh_sort_in_family sigma (expected_elimination_sort !!env tomatchs) in
+      let sigma, predcclj = typing_fun (Some (mkSort rtnsort)) envar sigma rtntyp in
       let predccl = nf_evar sigma predcclj.uj_val in
       [sigma, predccl, building_arsign]
   in
@@ -2149,7 +2205,7 @@ let constr_of_pat env sigma arsign pat avoid =
         let name, avoid = match name with
             Name n -> name, avoid
           | Anonymous ->
-              let previd, id = prime avoid (Name (Id.of_string "wildcard")) in
+              let id = next_ident_away wildcard_id avoid in
                 Name id, Id.Set.add id avoid
         in
         let r = Sorts.Relevant in (* TODO relevance *)
@@ -2164,7 +2220,7 @@ let constr_of_pat env sigma arsign pat avoid =
         in
         let (ind,u), params = dest_ind_family indf in
         let params = List.map EConstr.of_constr params in
-        if not (eq_ind ind cind) then error_bad_constructor ?loc env cstr ind;
+        if not (Ind.CanOrd.equal ind cind) then error_bad_constructor ?loc env cstr ind;
         let cstrs = get_constructors env indf in
         let ci = cstrs.(i-1) in
         let nb_args_constr = ci.cs_nargs in

@@ -71,6 +71,9 @@ let rec contract3' env sigma a b c = function
   | ConversionFailed (env',t1,t2) ->
       let (env',t1,t2) = contract2 env' sigma t1 t2 in
       contract3 env sigma a b c, ConversionFailed (env',t1,t2)
+  | IncompatibleInstances (env',ev,t1,t2) ->
+      let (env',ev,t1,t2) = contract3 env' sigma (EConstr.mkEvar ev) t1 t2 in
+      contract3 env sigma a b c, IncompatibleInstances (env',EConstr.destEvar sigma ev,t1,t2)
   | NotSameArgSize | NotSameHead | NoCanonicalStructure
   | MetaOccurInBody _ | InstanceNotSameType _ | ProblemBeyondCapabilities
   | UnifUnivInconsistency _ as x -> contract3 env sigma a b c, x
@@ -313,6 +316,13 @@ let explain_unification_error env sigma p1 p2 = function
           let t1, t2 = pr_explicit env sigma t1 t2 in
           [str "cannot unify " ++ t1 ++ strbrk " and " ++ t2]
         else []
+     | IncompatibleInstances (env,ev,t1,t2) ->
+        let env = make_all_name_different env sigma in
+        let ev = pr_leconstr_env env sigma (EConstr.mkEvar ev) in
+        let t1 = Reductionops.nf_betaiota env sigma t1 in
+        let t2 = Reductionops.nf_betaiota env sigma t2 in
+        let t1, t2 = pr_explicit env sigma t1 t2 in
+        [ev ++ strbrk " has otherwise to unify with " ++ t1 ++ str " which is incompatible with " ++ t2]
      | MetaOccurInBody evk ->
         [str "instance for " ++ quote (pr_existential_key sigma evk) ++
         strbrk " refers to a metavariable - please report your example" ++
@@ -646,7 +656,7 @@ let explain_evar_not_found env sigma id =
 
 let explain_wrong_case_info env (ind,u) ci =
   let pi = pr_inductive env ind in
-  if eq_ind ci.ci_ind ind then
+  if Ind.CanOrd.equal ci.ci_ind ind then
     str "Pattern-matching expression on an object of inductive type" ++
     spc () ++ pi ++ spc () ++ str "has invalid information."
   else
@@ -689,34 +699,29 @@ let explain_cannot_unify_binding_type env sigma m n =
   str "which should be unifiable with" ++ brk(1,1) ++ pn ++ str "."
 
 let explain_cannot_find_well_typed_abstraction env sigma p l e =
-  let p = EConstr.to_constr sigma p in
   str "Abstracting over the " ++
   str (String.plural (List.length l) "term") ++ spc () ++
-  hov 0 (pr_enum (fun c -> pr_lconstr_env env sigma (EConstr.to_constr sigma c)) l) ++ spc () ++
-  str "leads to a term" ++ spc () ++ pr_ltype_env ~goal_concl_style:true env sigma p ++
+  hov 0 (pr_enum (fun c -> pr_leconstr_env env sigma c) l) ++ spc () ++
+  str "leads to a term" ++ spc () ++ pr_letype_env ~goal_concl_style:true env sigma p ++
   spc () ++ str "which is ill-typed." ++
   (match e with None -> mt () | Some e -> fnl () ++ str "Reason is: " ++ e)
 
 let explain_wrong_abstraction_type env sigma na abs expected result =
-  let abs = EConstr.to_constr sigma abs in
-  let expected = EConstr.to_constr sigma expected in
-  let result = EConstr.to_constr sigma result in
   let ppname = match na with Name id -> Id.print id ++ spc () | _ -> mt () in
   str "Cannot instantiate metavariable " ++ ppname ++ strbrk "of type " ++
-  pr_lconstr_env env sigma expected ++ strbrk " with abstraction " ++
-  pr_lconstr_env env sigma abs ++ strbrk " of incompatible type " ++
-  pr_lconstr_env env sigma result ++ str "."
+  pr_leconstr_env env sigma expected ++ strbrk " with abstraction " ++
+  pr_leconstr_env env sigma abs ++ strbrk " of incompatible type " ++
+  pr_leconstr_env env sigma result ++ str "."
 
 let explain_abstraction_over_meta _ m n =
   strbrk "Too complex unification problem: cannot find a solution for both " ++
   Name.print m ++ spc () ++ str "and " ++ Name.print n ++ str "."
 
 let explain_non_linear_unification env sigma m t =
-  let t = EConstr.to_constr sigma t in
   strbrk "Cannot unambiguously instantiate " ++
   Name.print m ++ str ":" ++
   strbrk " which would require to abstract twice on " ++
-  pr_lconstr_env env sigma t ++ str "."
+  pr_leconstr_env env sigma t ++ str "."
 
 let explain_unsatisfied_constraints env sigma cst =
   strbrk "Unsatisfied constraints: " ++
@@ -738,6 +743,11 @@ let explain_bad_relevance env =
 
 let explain_bad_invert env =
   strbrk "Bad case inversion (maybe a bugged tactic)."
+
+let explain_bad_variance env sigma ~lev ~expected ~actual =
+  str "Incorrect variance for universe " ++ Termops.pr_evd_level sigma lev ++
+  str": expected " ++ Univ.Variance.pr expected ++
+  str " but cannot be less restrictive than " ++ Univ.Variance.pr actual ++ str "."
 
 let explain_type_error env sigma err =
   let env = make_all_name_different env sigma in
@@ -783,6 +793,7 @@ let explain_type_error env sigma err =
   | DisallowedSProp -> explain_disallowed_sprop ()
   | BadRelevance -> explain_bad_relevance env
   | BadInvert -> explain_bad_invert env
+  | BadVariance {lev;expected;actual} -> explain_bad_variance env sigma ~lev ~expected ~actual
 
 let pr_position (cl,pos) =
   let clpos = match cl with
@@ -803,10 +814,10 @@ let explain_cannot_unify_occurrences env sigma nested ((cl2,pos2),t2) ((cl1,pos1
       explain_unification_error env sigma c1 c2 (Some e)
     in
     str "Found incompatible occurrences of the pattern" ++ str ":" ++
-    spc () ++ str "Matched term " ++ pr_lconstr_env env sigma (EConstr.to_constr sigma t2) ++
+    spc () ++ str "Matched term " ++ pr_leconstr_env env sigma t2 ++
     strbrk " at position " ++ pr_position (cl2,pos2) ++
     strbrk " is not compatible with matched term " ++
-    pr_lconstr_env env sigma (EConstr.to_constr sigma t1) ++ strbrk " at position " ++
+    pr_leconstr_env env sigma t1 ++ strbrk " at position " ++
     pr_position (cl1,pos1) ++ ppreason ++ str "."
 
 let pr_constraints printenv env sigma evars cstrs =
@@ -826,7 +837,7 @@ let pr_constraints printenv env sigma evars cstrs =
         (fun (ev, evi) -> fnl () ++ pr_existential_key sigma ev ++
             str " : " ++ pr_leconstr_env env' sigma evi.evar_concl ++ fnl ()) l
       in
-      h 0 (pe ++ evs ++ pr_evar_constraints sigma cstrs)
+      h (pe ++ evs ++ pr_evar_constraints sigma cstrs)
     else
       let filter evk _ = Evar.Map.mem evk evars in
       pr_evar_map_filter ~with_univs:false filter env sigma
@@ -861,7 +872,7 @@ let explain_unsatisfiable_constraints env sigma constr comp =
     let info = Evar.Map.find ev undef in
     explain_typeclass_resolution env sigma info k ++ fnl () ++ cstr
 
-let explain_pretype_error env sigma err =
+let rec explain_pretype_error env sigma err =
   let env = Evardefine.env_nf_betaiotaevar sigma env in
   let env = make_all_name_different env sigma in
   match err with
@@ -888,7 +899,7 @@ let explain_pretype_error env sigma err =
   | CannotUnifyBindingType (m,n) -> explain_cannot_unify_binding_type env sigma m n
   | CannotFindWellTypedAbstraction (p,l,e) ->
       explain_cannot_find_well_typed_abstraction env sigma p l
-        (Option.map (fun (env',e) -> explain_type_error env' sigma e) e)
+        (Option.map (fun (env',e) -> explain_pretype_error env' sigma e) e)
   | WrongAbstractionType (n,a,t,u) ->
       explain_wrong_abstraction_type env sigma n a t u
   | AbstractionOverMeta (m,n) -> explain_abstraction_over_meta env m n
@@ -968,8 +979,8 @@ let explain_not_match_error = function
         (UContext.instance uctx)
         (UContext.constraints uctx)
     in
-    str "incompatible polymorphic binders: got" ++ spc () ++ h 0 (pr_auctx got) ++ spc() ++
-    str "but expected" ++ spc() ++ h 0 (pr_auctx expect) ++
+    str "incompatible polymorphic binders: got" ++ spc () ++ h (pr_auctx got) ++ spc() ++
+    str "but expected" ++ spc() ++ h (pr_auctx expect) ++
     (if not (Int.equal (AUContext.size got) (AUContext.size expect)) then mt() else
        fnl() ++ str "(incompatible constraints)")
   | IncompatibleVariance ->
@@ -1227,7 +1238,7 @@ let error_not_allowed_dependent_analysis env isrec i =
   pr_inductive env i ++ str "."
 
 let error_not_mutual_in_scheme env ind ind' =
-  if eq_ind ind ind' then
+  if Ind.CanOrd.equal ind ind' then
     str "The inductive type " ++ pr_inductive env ind ++
     str " occurs twice."
   else
@@ -1287,9 +1298,8 @@ let explain_recursion_scheme_error env = function
 (* Pattern-matching errors *)
 
 let explain_bad_pattern env sigma cstr ty =
-  let ty = EConstr.to_constr sigma ty in
   let env = make_all_name_different env sigma in
-  let pt = pr_lconstr_env env sigma ty in
+  let pt = pr_leconstr_env env sigma ty in
   let pc = pr_constructor env cstr in
   str "Found the constructor " ++ pc ++ brk(1,1) ++
   str "while matching a term of type " ++ pt ++ brk(1,1) ++
@@ -1326,12 +1336,11 @@ let explain_non_exhaustive env pats =
   spc () ++ hov 0 (prlist_with_sep pr_comma pr_cases_pattern pats)
 
 let explain_cannot_infer_predicate env sigma typs =
-  let inj c = EConstr.to_constr sigma c in
-  let typs = Array.map_to_list (fun (c1, c2) -> (inj c1, inj c2)) typs in
+  let typs = Array.to_list typs in
   let env = make_all_name_different env sigma in
   let pr_branch (cstr,typ) =
-    let cstr,_ = decompose_app cstr in
-    str "For " ++ pr_lconstr_env env sigma cstr ++ str ": " ++ pr_lconstr_env env sigma typ
+    let cstr,_ = EConstr.decompose_app sigma cstr in
+    str "For " ++ pr_leconstr_env env sigma cstr ++ str ": " ++ pr_leconstr_env env sigma typ
   in
   str "Unable to unify the types found in the branches:" ++
   spc () ++ hov 0 (prlist_with_sep fnl pr_branch typs)

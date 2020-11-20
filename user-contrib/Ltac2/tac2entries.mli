@@ -53,7 +53,7 @@ val print_ltac : Libnames.qualid -> unit
 (** {5 Eval loop} *)
 
 (** Evaluate a tactic expression in the current environment *)
-val call : pstate:Declare.Proof.t -> default:bool -> raw_tacexpr -> Declare.Proof.t
+val call : pstate:Declare.Proof.t -> with_end_tac:bool -> raw_tacexpr -> Declare.Proof.t
 
 (** {5 Toplevel exceptions} *)
 
@@ -63,7 +63,9 @@ val backtrace : backtrace Exninfo.t
 
 module Pltac :
 sig
+val ltac2_expr : raw_tacexpr Pcoq.Entry.t
 val tac2expr : raw_tacexpr Pcoq.Entry.t
+  [@@deprecated "Deprecated in 8.13; use 'ltac2_expr' instead"]
 val tac2expr_in_env : (Id.t CAst.t list * raw_tacexpr) Pcoq.Entry.t
 
 (** Quoted entries. To be used for complex notations. *)

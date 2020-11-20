@@ -10,7 +10,7 @@ manual.  Then, we present the essential vocabulary necessary to read
 the rest of the manual.  Other terms are defined throughout the manual.
 The reader may refer to the :ref:`glossary index <glossary_index>`
 for a complete list of defined terms.  Finally, we describe the various types of
-settings that |Coq| provides.
+settings that Coq provides.
 
 Syntax and lexical conventions
 ------------------------------
@@ -21,7 +21,7 @@ Syntax conventions
 ~~~~~~~~~~~~~~~~~~
 
 The syntax described in this documentation is equivalent to that
-accepted by the |Coq| parser, but the grammar has been edited
+accepted by the Coq parser, but the grammar has been edited
 to improve readability and presentation.
 
 In the grammar presented in this manual, the terminal symbols are
@@ -49,13 +49,13 @@ graphically using the following kinds of blocks:
 
 `Precedence levels
 <https://en.wikipedia.org/wiki/Order_of_operations>`_ that are
-implemented in the |Coq| parser are shown in the documentation by
+implemented in the Coq parser are shown in the documentation by
 appending the level to the nonterminal name (as in :n:`@term100` or
 :n:`@ltac_expr3`).
 
 .. note::
 
-   |Coq| uses an extensible parser.  Plugins and the :ref:`notation
+   Coq uses an extensible parser.  Plugins and the :ref:`notation
    system <syntax-extensions-and-notation-scopes>` can extend the
    syntax at run time.  Some notations are defined in the :term:`prelude`,
    which is loaded by default.  The documented grammar doesn't include
@@ -71,8 +71,8 @@ appending the level to the nonterminal name (as in :n:`@term100` or
 
    Given the complexity of these parsing rules, it would be extremely
    difficult to create an external program that can properly parse a
-   |Coq| document.  Therefore, tool writers are advised to delegate
-   parsing to |Coq|, by communicating with it, for instance through
+   Coq document.  Therefore, tool writers are advised to delegate
+   parsing to Coq, by communicating with it, for instance through
    `SerAPI <https://github.com/ejgallego/coq-serapi>`_.
 
 .. seealso:: :cmd:`Print Grammar`
@@ -111,32 +111,45 @@ Identifiers
   symbols and non-breaking space. :production:`unicode_id_part`
   non-exhaustively includes symbols for prime letters and subscripts.
 
-Numerals
-  Numerals are sequences of digits with an optional fractional part
-  and exponent, optionally preceded by a minus sign. Hexadecimal numerals
-  start with ``0x`` or ``0X``. :n:`@int` is an integer;
-  a numeral without fractional nor exponent parts. :n:`@num` is a non-negative
-  integer.  Underscores embedded in the digits are ignored, for example
+Numbers
+  Numbers are sequences of digits with an optional fractional part
+  and exponent, optionally preceded by a minus sign. Hexadecimal numbers
+  start with ``0x`` or ``0X``. :n:`@bigint` are integers;
+  numbers without fractional nor exponent parts. :n:`@bignat` are non-negative
+  integers.  Underscores embedded in the digits are ignored, for example
   ``1_000_000`` is the same as ``1000000``.
 
-  .. insertprodn numeral hexdigit
+  .. insertprodn number hexdigit
 
   .. prodn::
-     numeral ::= {? - } @decnum {? . {+ {| @digit | _ } } } {? {| e | E } {? {| + | - } } @decnum }
-     | {? - } @hexnum {? . {+ {| @hexdigit | _ } } } {? {| p | P } {? {| + | - } } @decnum }
-     int ::= {? - } @num
-     num ::= {| @decnum | @hexnum }
-     decnum ::= @digit {* {| @digit | _ } }
+     number ::= {? - } @decnat {? . {+ {| @digit | _ } } } {? {| e | E } {? {| + | - } } @decnat }
+     | {? - } @hexnat {? . {+ {| @hexdigit | _ } } } {? {| p | P } {? {| + | - } } @decnat }
+     integer ::= {? - } @natural
+     natural ::= @bignat
+     bigint ::= {? - } @bignat
+     bignat ::= {| @decnat | @hexnat }
+     decnat ::= @digit {* {| @digit | _ } }
      digit ::= 0 .. 9
-     hexnum ::= {| 0x | 0X } @hexdigit {* {| @hexdigit | _ } }
+     hexnat ::= {| 0x | 0X } @hexdigit {* {| @hexdigit | _ } }
      hexdigit ::= {| 0 .. 9 | a .. f | A .. F }
 
-  .. todo PR need some code fixes for hex, see PR 11948
+  :n:`@integer` and :n:`@natural` are limited to the range that fits
+  into an OCaml integer (63-bit integers on most architectures).
+  :n:`@bigint` and :n:`@bignat` have no range limitation.
+
+  The :ref:`standard library <thecoqlibrary>` provides some
+  :ref:`interpretations <notation-scopes>` for :n:`@number`. The
+  :cmd:`Number Notation` mechanism offers the user
+  a way to define custom parsers and printers for :n:`@number`.
 
 Strings
   Strings begin and end with ``"`` (double quote).  Use ``""`` to represent
   a double quote character within a string.  In the grammar, strings are
   identified with :production:`string`.
+
+  The :cmd:`String Notation` mechanism offers the
+  user a way to define custom parsers and printers for
+  :token:`string`.
 
 Keywords
   The following character sequences are keywords defined in the main Coq grammar
@@ -159,7 +172,7 @@ Other tokens
   (even when starting Coq with the `-noinit` command-line flag)::
 
     ! #[ % & ' ( () ) * + , - ->
-    . .( .. ... / : ::= := :> :>> ; < <+ <- <:
+    . .( .. ... / : ::= := :> ; < <+ <- <:
     <<: <= = => > >-> >= ? @ @{ [ ] _
     `( `{ { {| | }
 
@@ -182,7 +195,7 @@ Essential vocabulary
 --------------------
 
 This section presents the most essential notions to understand the
-rest of the |Coq| manual: :term:`terms <term>` and :term:`types
+rest of the Coq manual: :term:`terms <term>` and :term:`types
 <type>` on the one hand, :term:`commands <command>` and :term:`tactics
 <tactic>` on the other hand.
 
@@ -190,14 +203,14 @@ rest of the |Coq| manual: :term:`terms <term>` and :term:`types
 
    term
 
-     Terms are the basic expressions of |Coq|.  Terms can represent
+     Terms are the basic expressions of Coq.  Terms can represent
      mathematical expressions, propositions and proofs, but also
      executable programs and program types.
 
      Here is the top-level syntax of terms.  Each of the listed
      constructs is presented in a dedicated section.  Some of these
      constructs (like :n:`@term_forall_or_fun`) are part of the core
-     language that the kernel of |Coq| understands and are therefore
+     language that the kernel of Coq understands and are therefore
      described in :ref:`this chapter <core-language>`, while
      others (like :n:`@term_if`) are language extensions that are
      presented in :ref:`the next chapter <extensions>`.
@@ -243,18 +256,18 @@ rest of the |Coq| manual: :term:`terms <term>` and :term:`types
 
    type
 
-     To be valid and accepted by the |Coq| kernel, a term needs an
+     To be valid and accepted by the Coq kernel, a term needs an
      associated type.  We express this relationship by “:math:`x` *of
      type* :math:`T`”, which we write as “:math:`x:T`”.  Informally,
      “:math:`x:T`” can be thought as “:math:`x` *belongs to*
      :math:`T`”.
 
-     The |Coq| kernel is a type checker: it verifies that a term has
+     The Coq kernel is a type checker: it verifies that a term has
      the expected type by applying a set of typing rules (see
      :ref:`Typing-rules`).  If that's indeed the case, we say that the
      term is :gdef:`well-typed`.
 
-     A special feature of the |Coq| language is that types can depend
+     A special feature of the Coq language is that types can depend
      on terms (we say that the language is `dependently-typed
      <https://en.wikipedia.org/wiki/Dependent_type>`_).  Because of
      this, types and terms share a common syntax.  All types are terms,
@@ -276,13 +289,13 @@ rest of the |Coq| manual: :term:`terms <term>` and :term:`types
      mathematics alternative to the standard `"set theory"
      <https://en.wikipedia.org/wiki/Set_theory>`_: we call such
      logical foundations `"type theories"
-     <https://en.wikipedia.org/wiki/Type_theory>`_.  |Coq| is based on
+     <https://en.wikipedia.org/wiki/Type_theory>`_.  Coq is based on
      the Calculus of Inductive Constructions, which is a particular
      instance of type theory.
 
    sentence
 
-     |Coq| documents are made of a series of sentences that contain
+     Coq documents are made of a series of sentences that contain
      :term:`commands <command>` or :term:`tactics <tactic>`, generally
      terminated with a period and optionally decorated with
      :term:`attributes <attribute>`.
@@ -292,7 +305,7 @@ rest of the |Coq| manual: :term:`terms <term>` and :term:`types
      .. prodn::
         document ::= {* @sentence }
         sentence ::= {? @attributes } @command .
-        | {? @attributes } {? @num : } @query_command .
+        | {? @attributes } {? @natural : } @query_command .
         | {? @attributes } {? @toplevel_selector : } @ltac_expr {| . | ... }
         | @control_command
 
@@ -302,7 +315,7 @@ rest of the |Coq| manual: :term:`terms <term>` and :term:`types
 
    command
 
-     A :production:`command` can be used to modify the state of a |Coq|
+     A :production:`command` can be used to modify the state of a Coq
      document, for instance by declaring a new object, or to get
      information about the current state.
 
@@ -312,16 +325,16 @@ rest of the |Coq| manual: :term:`terms <term>` and :term:`types
      boldface label "Command:".  Commands are listed in the
      :ref:`command_index`.  Example:
 
-     .. cmd:: Comments {* @string }
+     .. cmd:: Comments {* {| @one_term | @string | @natural } }
 
-        This command prints "Comments ok" and does not change anything
-        to the state of the document.
+        Prints "Comments ok" and does not change
+        the state of the document.
 
    tactic
 
      Tactics specify how to transform the current proof state as a
      step in creating a proof.  They are syntactically valid only when
-     |Coq| is in proof mode, such as after a :cmd:`Theorem` command
+     Coq is in proof mode, such as after a :cmd:`Theorem` command
      and before any subsequent proof-terminating command such as
      :cmd:`Qed`.  See :ref:`proofhandling` for more on proof mode.
 
@@ -333,10 +346,10 @@ rest of the |Coq| manual: :term:`terms <term>` and :term:`types
 Settings
 --------
 
-There are several mechanisms for changing the behavior of |Coq|.  The
+There are several mechanisms for changing the behavior of Coq.  The
 :term:`attribute` mechanism is used to modify the behavior of a single
 :term:`sentence`.  The :term:`flag`, :term:`option` and :term:`table`
-mechanisms are used to modify the behavior of |Coq| more globally in a
+mechanisms are used to modify the behavior of Coq more globally in a
 document or project.
 
 .. _attributes:
@@ -356,6 +369,7 @@ this attribute`.
    attributes ::= {* #[ {*, @attribute } ] } {* @legacy_attr }
    attribute ::= @ident {? @attr_value }
    attr_value ::= = @string
+   | = @ident
    | ( {*, @attribute } )
    legacy_attr ::= {| Local | Global }
    | {| Polymorphic | Monomorphic }
@@ -366,21 +380,22 @@ this attribute`.
 The order of top-level attributes doesn't affect their meaning.  ``#[foo,bar]``, ``#[bar,foo]``,
 ``#[foo]#[bar]`` and ``#[bar]#[foo]`` are equivalent.
 
+:gdef:`Boolean attributes <boolean attribute>` take the form :n:`@ident__attr{? = {| yes | no } }`.
+When the :n:`{| yes | no }` value is omitted, the default is :n:`yes`.
+
 The legacy attributes (:n:`@legacy_attr`) provide an older, alternate syntax
 for certain attributes.  They are equivalent to new attributes as follows:
 
-================  ================================
-Legacy attribute  New attribute
-================  ================================
-`Local`           :attr:`local`
-`Global`          :attr:`global`
-`Polymorphic`     :attr:`universes(polymorphic)`
-`Monomorphic`     :attr:`universes(monomorphic)`
-`Cumulative`      :attr:`universes(cumulative)`
-`NonCumulative`   :attr:`universes(noncumulative)`
-`Private`         :attr:`private(matching)`
-`Program`         :attr:`program`
-================  ================================
+=============================  ================================
+Legacy attribute               New attribute
+=============================  ================================
+`Local`                        :attr:`local`
+`Global`                       :attr:`global`
+`Polymorphic`, `Monomorphic`   :attr:`universes(polymorphic)`
+`Cumulative`, `NonCumulative`  :attr:`universes(cumulative)`
+`Private`                      :attr:`private(matching)`
+`Program`                      :attr:`program`
+=============================  ================================
 
 Attributes appear in the HTML documentation in blue or gray boxes
 after the label "Attribute".  In the pdf, they appear after the
@@ -407,7 +422,7 @@ boldface label "Attribute:".  Attributes are listed in the
 Flags, Options and Tables
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The following types of settings can be used to change the behavior of |Coq| in
+The following types of settings can be used to change the behavior of Coq in
 subsequent commands and tactics (see :ref:`set_unset_scope_qualifiers` for a
 more precise description of the scope of these settings):
 
@@ -434,7 +449,7 @@ gray boxes after the labels "Flag", "Option" and "Table".  In the pdf,
 they appear after a boldface label.  They are listed in the
 :ref:`options_index`.
 
-.. cmd:: Set @setting_name {? {| @int | @string } }
+.. cmd:: Set @setting_name {? {| @integer | @string } }
    :name: Set
 
    If :n:`@setting_name` is a flag, no value may be provided; the flag
@@ -450,10 +465,10 @@ they appear after a boldface label.  They are listed in the
       This warning message can be raised by :cmd:`Set` and
       :cmd:`Unset` when :n:`@setting_name` is unknown.  It is a
       warning rather than an error because this helps library authors
-      produce |Coq| code that is compatible with several |Coq| versions.
+      produce Coq code that is compatible with several Coq versions.
       To preserve the same behavior, they may need to set some
       compatibility flags or options that did not exist in previous
-      |Coq| versions.
+      Coq versions.
 
 .. cmd:: Unset @setting_name
    :name: Unset

@@ -1098,14 +1098,8 @@ module FNativeEntries =
 
     let defined_array = ref false
 
-    let farray = ref dummy
-
     let init_array retro =
-      match retro.Retroknowledge.retro_array with
-      | Some c ->
-        defined_array := true;
-        farray := { mark = mark Norm KnownR; term = FFlex (ConstKey (Univ.in_punivs c)) }
-      | None -> defined_array := false
+      defined_array := Option.has_some retro.Retroknowledge.retro_array
 
     let init env =
       current_retro := env.retroknowledge;
@@ -1165,7 +1159,7 @@ module FNativeEntries =
 
     let mkFloat env f =
       check_float env;
-      { mark = mark Norm KnownR; term = FFloat f }
+      { mark = mark Cstr KnownR; term = FFloat f }
 
     let mkBool env b =
       check_bool env;
@@ -1328,10 +1322,14 @@ let rec knr info tab m stk =
   | FFlex(ConstKey (kn,_u as c)) when red_set info.i_flags (fCONST kn) ->
       (match ref_value_cache info tab (ConstKey c) with
         | Def v -> kni info tab v stk
-        | Primitive op when check_native_args op stk ->
-          let rargs, a, nargs, stk = get_native_args1 op c stk in
-          kni info tab a (Zprimitive(op,c,rargs,nargs)::stk)
-        | Undef _ | OpaqueDef _ | Primitive _ -> (set_norm m; (m,stk)))
+        | Primitive op ->
+          if check_native_args op stk then
+            let rargs, a, nargs, stk = get_native_args1 op c stk in
+            kni info tab a (Zprimitive(op,c,rargs,nargs)::stk)
+          else
+            (* Similarly to fix, partially applied primitives are not Norm! *)
+            (m, stk)
+        | Undef _ | OpaqueDef _ -> (set_norm m; (m,stk)))
   | FFlex(VarKey id) when red_set info.i_flags (fVAR id) ->
       (match ref_value_cache info tab (VarKey id) with
         | Def v -> kni info tab v stk
@@ -1531,7 +1529,12 @@ let whd_stack infos tab m stk = match Mark.red_state m.mark with
   knh infos m stk
 | Red | Cstr ->
   let k = kni infos tab m stk in
-  let () = if infos.i_cache.i_share then ignore (fapp_stack k) in (* to unlock Zupdates! *)
+  let () =
+    if infos.i_cache.i_share then
+      (* to unlock Zupdates! *)
+      let (m', stk') = k in
+      if not (m == m' && stk == stk') then ignore (zip m' stk')
+  in
   k
 
 let create_clos_infos ?univs ?(evars=fun _ -> None) flgs env =

@@ -12,7 +12,7 @@ General Presentation
 
    The status of Universe Polymorphism is experimental.
 
-This section describes the universe polymorphic extension of |Coq|.
+This section describes the universe polymorphic extension of Coq.
 Universe polymorphism makes it possible to write generic definitions
 making use of universes and reuse them at different and sometimes
 incompatible universe levels.
@@ -122,31 +122,37 @@ in a universe strictly higher than :g:`Set`.
 Polymorphic, Monomorphic
 -------------------------
 
-.. attr:: universes(polymorphic)
+.. attr:: universes(polymorphic{? = {| yes | no } })
+   :name: universes(polymorphic); Polymorphic; Monomorphic
 
-   This attribute can be used to declare universe polymorphic
-   definitions and inductive types.  There is also a legacy syntax
-   using the ``Polymorphic`` prefix (see :n:`@legacy_attr`) which, as
-   shown in the examples, is more commonly used.
+   This :term:`boolean attribute` can be used to control whether universe
+   polymorphism is enabled in the definition of an inductive type.
+   There is also a legacy syntax using the ``Polymorphic`` prefix (see
+   :n:`@legacy_attr`) which, as shown in the examples, is more
+   commonly used.
+
+   When ``universes(polymorphic=no)`` is used, global universe constraints
+   are produced, even when the :flag:`Universe Polymorphism` flag is
+   on. There is also a legacy syntax using the ``Monomorphic`` prefix
+   (see :n:`@legacy_attr`).
+
+.. attr:: universes(monomorphic)
+
+   .. deprecated:: 8.13
+
+      Use :attr:`universes(polymorphic=no) <universes(polymorphic)>`
+      instead.
 
 .. flag:: Universe Polymorphism
 
    This flag is off by default.  When it is on, new declarations are
-   polymorphic unless the :attr:`universes(monomorphic)` attribute is
-   used.
-
-.. attr:: universes(monomorphic)
-
-   This attribute can be used to declare universe monomorphic
-   definitions and inductive types (i.e. global universe constraints
-   are produced), even when the :flag:`Universe Polymorphism` flag is
-   on.  There is also a legacy syntax using the ``Monomorphic`` prefix
-   (see :n:`@legacy_attr`).
+   polymorphic unless the :attr:`universes(polymorphic=no) <universes(polymorphic)>`
+   attribute is used to override the default.
 
 Many other commands can be used to declare universe polymorphic or
 monomorphic constants depending on whether the :flag:`Universe
-Polymorphism` flag is on or the :attr:`universes(polymorphic)` or
-:attr:`universes(monomorphic)` attributes are used:
+Polymorphism` flag is on or the :attr:`universes(polymorphic)`
+attribute is used:
 
 - :cmd:`Lemma`, :cmd:`Axiom`, etc. can be used to declare universe
   polymorphic constants.
@@ -169,18 +175,27 @@ Polymorphism` flag is on or the :attr:`universes(polymorphic)` or
 Cumulative, NonCumulative
 -------------------------
 
-.. attr:: universes(cumulative)
+.. attr:: universes(cumulative{? = {| yes | no } })
+   :name: universes(cumulative); Cumulative; NonCumulative
 
    Polymorphic inductive types, coinductive types, variants and
-   records can be declared cumulative using this attribute or the
-   legacy ``Cumulative`` prefix (see :n:`@legacy_attr`) which, as
+   records can be declared cumulative using this :term:`boolean attribute`
+   or the legacy ``Cumulative`` prefix (see :n:`@legacy_attr`) which, as
    shown in the examples, is more commonly used.
 
    This means that two instances of the same inductive type (family)
    are convertible based on the universe variances; they do not need
    to be equal.
 
-   .. exn:: The cumulative and noncumulative attributes can only be used in a polymorphic context.
+   When the attribtue is off, the inductive type is non-cumulative
+   even if the :flag:`Polymorphic Inductive Cumulativity` flag is on.
+   There is also a legacy syntax using the ``NonCumulative`` prefix
+   (see :n:`@legacy_attr`).
+
+   This means that two instances of the same inductive type (family)
+   are convertible only if all the universes are equal.
+
+   .. exn:: The cumulative attribute can only be used in a polymorphic context.
 
       Using this attribute requires being in a polymorphic context,
       i.e. either having the :flag:`Universe Polymorphism` flag on, or
@@ -189,25 +204,21 @@ Cumulative, NonCumulative
 
    .. note::
 
-      ``#[ universes(polymorphic), universes(cumulative) ]`` can be
-      abbreviated into ``#[ universes(polymorphic, cumulative) ]``.
+      :n:`#[ universes(polymorphic{? = yes }), universes(cumulative{? = {| yes | no } }) ]` can be
+      abbreviated into :n:`#[ universes(polymorphic{? = yes }, cumulative{? = {| yes | no } }) ]`.
+
+.. attr:: universes(noncumulative)
+
+   .. deprecated:: 8.13
+
+      Use :attr:`universes(cumulative=no) <universes(cumulative)>` instead.
 
 .. flag:: Polymorphic Inductive Cumulativity
 
    When this flag is on (it is off by default), it makes all
    subsequent *polymorphic* inductive definitions cumulative, unless
-   the :attr:`universes(noncumulative)` attribute is used.  It has no
-   effect on *monomorphic* inductive definitions.
-
-.. attr:: universes(noncumulative)
-
-   Declares the inductive type as non-cumulative even if the
-   :flag:`Polymorphic Inductive Cumulativity` flag is on.  There is
-   also a legacy syntax using the ``NonCumulative`` prefix (see
-   :n:`@legacy_attr`).
-
-   This means that two instances of the same inductive type (family)
-   are convertible only if all the universes are equal.
+   the :attr:`universes(cumulative=no) <universes(cumulative)>` attribute is
+   used to override the default.  It has no effect on *monomorphic* inductive definitions.
 
 Consider the examples below.
 
@@ -227,7 +238,7 @@ constraints by prefixing the level names with symbols.
 Because inductive subtypings are only produced by comparing inductives
 to themselves with universes changed, they amount to variance
 information: each universe is either invariant, covariant or
-irrelevant (there are no contravariant subtypings in |Coq|),
+irrelevant (there are no contravariant subtypings in Coq),
 respectively represented by the symbols `=`, `+` and `*`.
 
 Here we see that :g:`list` binds an irrelevant universe, so any two
@@ -242,6 +253,7 @@ The following is an example of a record with non-trivial subtyping relation:
 .. coqtop:: all
 
    Polymorphic Cumulative Record packType := {pk : Type}.
+   About packType.
 
 :g:`packType` binds a covariant universe, i.e.
 
@@ -249,6 +261,27 @@ The following is an example of a record with non-trivial subtyping relation:
 
    E[Γ] ⊢ \mathsf{packType}@\{i\} =_{βδιζη}
    \mathsf{packType}@\{j\}~\mbox{ whenever }~i ≤ j
+
+Specifying cumulativity
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The variance of the universe parameters for a cumulative inductive may be specified by the user.
+
+For the following type, universe ``a`` has its variance automatically
+inferred (it is irrelevant), ``b`` is required to be irrelevant,
+``c`` is covariant and ``d`` is invariant. With these annotations
+``c`` and ``d`` have less general variances than would be inferred.
+
+.. coqtop:: all
+
+   Polymorphic Cumulative Inductive Dummy@{a *b +c =d} : Prop := dummy.
+   About Dummy.
+
+Insufficiently restrictive variance annotations lead to errors:
+
+.. coqtop:: all
+
+   Fail Polymorphic Cumulative Record bad@{*a} := {p : Type@{a}}.
 
 An example of a proof using cumulativity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -276,7 +309,7 @@ An example of a proof using cumulativity
    End down.
 
 Cumulativity Weak Constraints
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. flag:: Cumulativity Weak Constraints
 
@@ -379,34 +412,32 @@ Explicit Universes
    | _
    | @qualid
    univ_decl ::= @%{ {* @ident } {? + } {? %| {*, @univ_constraint } {? + } } %}
+   cumul_univ_decl ::= @%{ {* {? {| = | + | * } } @ident } {? + } {? %| {*, @univ_constraint } {? + } } %}
    univ_constraint ::= @universe_name {| < | = | <= } @universe_name
 
 The syntax has been extended to allow users to explicitly bind names
 to universes and explicitly instantiate polymorphic definitions.
 
-.. cmd:: Universe @ident
-         Polymorphic Universe @ident
+.. cmd:: Universe {+ @ident }
 
-   In the monorphic case, this command declares a new global universe
-   named :token:`ident`, which can be referred to using its qualified name
-   as well. Global universe names live in a separate namespace. The
-   command supports the :attr:`universes(polymorphic)` attribute (or
-   the ``Polymorphic`` prefix) only in sections, meaning the universe
-   quantification will be discharged on each section definition
+   In the monomorphic case, declares new global universes
+   with the given names.  Global universe names live in a separate namespace.
+   The command supports the :attr:`universes(polymorphic)` attribute (or
+   the ``Polymorphic`` legacy attribute) only in sections, meaning the universe
+   quantification will be discharged for each section definition
    independently.
 
    .. exn:: Polymorphic universes can only be declared inside sections, use Monomorphic Universe instead.
       :undocumented:
 
-.. cmd:: Constraint @univ_constraint
-         Polymorphic Constraint @univ_constraint
+.. cmd:: Constraint {+, @univ_constraint }
 
-   This command declares a new constraint between named universes.
+   Declares new constraints between named universes.
 
-   If consistent, the constraint is then enforced in the global
+   If consistent, the constraints are then enforced in the global
    environment. Like :cmd:`Universe`, it can be used with the
    :attr:`universes(polymorphic)` attribute (or the ``Polymorphic``
-   prefix) in sections only to declare constraints discharged at
+   legacy attribute) in sections only to declare constraints discharged at
    section closing time. One cannot declare a global constraint on
    polymorphic universes.
 
@@ -473,7 +504,7 @@ mode, introduced universe names can be referred to in terms. Note that
 local universe names shadow global universe names. During a proof, one
 can use :cmd:`Show Universes` to display the current context of universes.
 
-It is possible to provide only some universe levels and let |Coq| infer the others
+It is possible to provide only some universe levels and let Coq infer the others
 by adding a :g:`+` in the list of bound universe levels:
 
 .. coqtop:: all

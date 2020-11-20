@@ -12,12 +12,14 @@ open Coqpp_parser
 open Coqpp_ast
 
 let exit_code = ref 0
+let error_count = ref 0
 let show_warn = ref true
 
 let fprintf = Printf.fprintf
 
 let error s =
   exit_code := 1;
+  incr error_count;
   Printf.eprintf "Error: ";
   Printf.eprintf s
 
@@ -309,6 +311,11 @@ let rec output_prodn = function
             | "{|" -> "%{%|"
             | "`{" -> "`%{"
             | "@{" -> "@%{"
+            | "|-" -> "%|-"
+            | "|->" -> "%|->"
+            | "||" -> "%||"
+            | "|||" -> "%|||"
+            | "||||" -> "%||||"
             | "{"
             | "}"
             | "|" -> "%" ^ s
@@ -354,10 +361,9 @@ and prod_to_prodn prod = String.concat " " (prod_to_prodn_r prod)
 let get_tag file prod =
   List.fold_left (fun rv sym ->
       match sym with
-        (* todo: temporarily limited to Ltac2 tags in prodn when not in ltac2.rst *)
-      | Sedit2 ("TAG", s2)
-        when (s2 = "Ltac2" || s2 = "not Ltac2") &&
-            file <> "doc/sphinx/proof-engine/ltac2.rst" -> "   " ^ s2
+        (* todo: only Ltac2 and SSR for now, outside of their main chapters *)
+      | Sedit2 ("TAG", "Ltac2") when file <> "doc/sphinx/proof-engine/ltac2.rst" -> "   Ltac2"
+      | Sedit2 ("TAG", "SSR") when file <> "doc/sphinx/proof-engine/ssreflect-proof-language.rst" -> "   SSR"
       | _ -> rv
     ) "" prod
 
@@ -538,12 +544,11 @@ let autoloaded_mlgs = [ (* in the order they are loaded by Coq *)
  "plugins/ltac/g_eqdecide.mlg";
  "plugins/ltac/g_tactic.mlg";
  "plugins/ltac/g_ltac.mlg";
- "plugins/syntax/g_string.mlg";
  "plugins/btauto/g_btauto.mlg";
  "plugins/rtauto/g_rtauto.mlg";
  "plugins/cc/g_congruence.mlg";
  "plugins/firstorder/g_ground.mlg";
- "plugins/syntax/g_numeral.mlg";
+ "plugins/syntax/g_number_string.mlg";
 ]
 
 
@@ -555,6 +560,10 @@ let level_regex = Str.regexp "[a-zA-Z0-9_]*$"
 let get_plugin_name file =
   if file = "user-contrib/Ltac2/g_ltac2.mlg" then
     "Ltac2"
+  (* todo: would be better if g_search.mlg has an "ssr" prefix *)
+  else if List.mem file ["plugins/ssr/ssrparser.mlg"; "plugins/ssr/ssrvernac.mlg";
+      "plugins/ssrmatching/g_ssrmatching.mlg"; "plugins/ssrsearch/g_search.mlg"] then
+    "SSR"
   else if Str.string_match plugin_regex file 0 then
     Str.matched_group 1 file
   else
@@ -564,12 +573,12 @@ let read_mlg g is_edit ast file level_renames symdef_map =
   let res = ref [] in
   let locals = ref StringSet.empty in
   let dup_renames = ref StringMap.empty in
-  let add_prods nt prods =
+  let add_prods nt prods gramext_globals =
     if not is_edit then
-      if NTMap.mem nt !g.map && nt <> "command" && nt <> "simple_tactic" then begin
+      if NTMap.mem nt !g.map && not (List.mem nt gramext_globals) && nt <> "command" && nt <> "simple_tactic" then begin
         let new_name = String.uppercase_ascii (Filename.remove_extension (Filename.basename file)) ^ "_" ^ nt in
         dup_renames := StringMap.add nt new_name !dup_renames;
-        Printf.printf "** dup sym %s -> %s in %s\n" nt new_name file
+        if false then Printf.printf "** dup local sym %s -> %s in %s\n" nt new_name file
       end;
       add_symdef nt file symdef_map;
     let plugin = get_plugin_name file in
@@ -590,11 +599,12 @@ let read_mlg g is_edit ast file level_renames symdef_map =
         | Some s -> s
         | None -> ""
       in
+      let gramext_globals = ref grammar_ext.gramext_globals in
       List.iter (fun ent ->
           let len = List.length ent.gentry_rules in
           List.iteri (fun i rule ->
               let nt = ent.gentry_name in
-              if not (List.mem nt grammar_ext.gramext_globals) then
+              if not (List.mem nt !gramext_globals) then
                 locals := StringSet.add nt !locals;
               let level = (get_label rule.grule_label) in
               let level = if level <> "" then level else
@@ -625,8 +635,11 @@ let read_mlg g is_edit ast file level_renames symdef_map =
                 if cur_level <> nt && i+1 < len then
                   edited @ [[Snterm next_level]]
                 else
-                  edited in
-              add_prods cur_level prods_to_add)
+                  edited
+              in
+              if cur_level <> nt && List.mem nt !gramext_globals then
+                gramext_globals := cur_level :: !gramext_globals;
+              add_prods cur_level prods_to_add !gramext_globals)
             ent.gentry_rules
         ) grammar_ext.gramext_entries
 
@@ -636,16 +649,16 @@ let read_mlg g is_edit ast file level_renames symdef_map =
       | Some c -> String.trim c.code
       in
       add_prods node
-        (List.map (fun r -> cvt_ext r.vernac_toks) vernac_ext.vernacext_rules)
+        (List.map (fun r -> cvt_ext r.vernac_toks) vernac_ext.vernacext_rules) []
     | VernacArgumentExt vernac_argument_ext ->
       add_prods vernac_argument_ext.vernacargext_name
-        (List.map (fun r -> cvt_ext r.tac_toks) vernac_argument_ext.vernacargext_rules)
+        (List.map (fun r -> cvt_ext r.tac_toks) vernac_argument_ext.vernacargext_rules) []
     | TacticExt tactic_ext ->
       add_prods "simple_tactic"
-        (List.map (fun r -> cvt_ext r.tac_toks) tactic_ext.tacext_rules)
+        (List.map (fun r -> cvt_ext r.tac_toks) tactic_ext.tacext_rules) []
     | ArgumentExt argument_ext ->
       add_prods argument_ext.argext_name
-        (List.map (fun r -> cvt_ext r.tac_toks) argument_ext.argext_rules)
+        (List.map (fun r -> cvt_ext r.tac_toks) argument_ext.argext_rules) []
     | _ -> ()
   in
 
@@ -909,14 +922,17 @@ let apply_splice g edit_map =
   List.iter (fun b ->
       let (nt0, prods0) = b in
       let rec splice_loop nt prods cnt =
-        let max_cnt = 10 in
-        let (nt', prods') = edit_rule g edit_map nt prods in
-        if cnt > max_cnt then
-          error "Splice for '%s' not done after %d iterations\n" nt0 max_cnt;
-        if nt' = nt && prods' = prods then
-          (nt', prods')
-        else
-          splice_loop nt' prods' (cnt+1)
+        if cnt >= 10 then begin
+          error "Splice for '%s' not done after %d iterations.  Current value is:\n" nt0 cnt;
+          List.iter (fun prod -> Printf.eprintf "  %s\n" (prod_to_str prod)) prods;
+          (nt, prods)
+        end else begin
+          let (nt', prods') = edit_rule g edit_map nt prods in
+          if nt' = nt && prods' = prods then
+            (nt, prods)
+          else
+            splice_loop nt' prods' (cnt+1)
+        end
       in
       let (nt', prods') = splice_loop nt0 prods0 0 in
       g_update_prods g nt' prods')
@@ -1188,6 +1204,15 @@ let edit_all_prods g op eprods =
   | "DELETE" -> do_it op eprods 1; true
   | "SPLICE" -> do_it op eprods 1; true
   | "MERGE" -> do_it op eprods 2; true
+  | "OPTINREF" ->
+      List.iter (fun nt ->
+        let prods = NTMap.find nt !g.map in
+        if has_match [] prods then begin
+          let prods' = remove_prod [] prods nt in
+          g_update_prods g nt prods';
+          global_repl g [(Snterm nt)] [(Sopt (Snterm nt))]
+        end)
+      !g.order; true
   | "EXPAND" ->
     if List.length eprods > 1 || List.length (List.hd eprods) <> 0 then
       error "'EXPAND:' expects a single empty production\n";
@@ -1724,6 +1749,7 @@ let open_temp_bin file =
 
 let match_cmd_regex = Str.regexp "[a-zA-Z0-9_ ]+"
 let match_subscripts = Str.regexp "__[a-zA-Z0-9]+"
+let remove_subscrs str = Str.global_replace match_subscripts "" str
 
 let find_longest_match prods str =
   let get_pfx str = String.trim (if Str.string_match match_cmd_regex str 0 then Str.matched_string str else "") in
@@ -1737,7 +1763,6 @@ let find_longest_match prods str =
     in
     aux 0
   in
-  let remove_subscrs str = Str.global_replace match_subscripts "" str in
 
   let slen = String.length str in
   let str_pfx = get_pfx str in
@@ -1892,25 +1917,18 @@ let process_rst g file args seen tac_prods cmd_prods =
 (*    "doc/sphinx/proof-engine/ssreflect-proof-language.rst"]*)
 (*  in*)
 
-  let cmd_replace_files = [
-    "doc/sphinx/language/core/records.rst";
-    "doc/sphinx/language/core/sections.rst";
-    "doc/sphinx/language/extensions/implicit-arguments.rst";
-    "doc/sphinx/language/extensions/arguments-command.rst";
-    "doc/sphinx/language/gallina-extensions.rst";
-    "doc/sphinx/language/gallina-specification-language.rst";
-    "doc/sphinx/language/using/libraries/funind.rst";
-    "doc/sphinx/proof-engine/ltac.rst";
-    "doc/sphinx/proof-engine/ltac2.rst";
-    "doc/sphinx/proof-engine/vernacular-commands.rst";
-    "doc/sphinx/user-extensions/syntax-extensions.rst";
-    "doc/sphinx/proof-engine/vernacular-commands.rst"
+  let cmd_exclude_files = [
+    "doc/sphinx/proof-engine/ssreflect-proof-language.rst";
+    "doc/sphinx/proofs/automatic-tactics/auto.rst";
+    "doc/sphinx/proofs/writing-proofs/rewriting.rst";
+    "doc/sphinx/proofs/writing-proofs/proof-mode.rst";
+    "doc/sphinx/proof-engine/tactics.rst";
   ]
   in
 
   let save_n_get_more direc pfx first_rhs seen_map prods =
     let replace rhs prods =
-      if StringSet.is_empty prods || not (List.mem file cmd_replace_files) then
+      if StringSet.is_empty prods || (List.mem file cmd_exclude_files) then
         rhs (* no change *)
       else
         let mtch, multi, best = find_longest_match prods rhs in
@@ -1918,12 +1936,15 @@ let process_rst g file args seen tac_prods cmd_prods =
         if mtch = rhs then
           rhs (* no change *)
         else if mtch = "" then begin
-          warn "%s line %d: NO MATCH `%s`\n" file !linenum rhs;
-          if best <> "" then
-            warn "%s line %d: BEST `%s`\n" file !linenum best;
+          error "%s line %d: NO MATCH for `%s`\n" file !linenum rhs;
+          if best <> "" then begin
+            Printf.eprintf "    closest match is: `%s`\n" best;
+            Printf.eprintf "    Please update the rst manually while preserving any subscripts, e.g. 'NT__sub'\n"
+          end;
           rhs
         end else if multi then begin
-          warn "%s line %d: MULTIMATCH `%s`\n" file !linenum rhs;
+          error "%s line %d: MULTIPLE MATCHES for `%s`\n" file !linenum rhs;
+          Printf.eprintf "    Please update the rst manually while preserving any subscripts, e.g. 'NT__sub'\n";
           rhs
         end else
           mtch (* update cmd/tacn *)
@@ -1936,7 +1957,7 @@ let process_rst g file args seen tac_prods cmd_prods =
 
     fprintf new_rst "%s%s\n" pfx (replace first_rhs prods);
 
-    map := NTMap.add first_rhs (file, !linenum) !map;
+    map := NTMap.add (remove_subscrs first_rhs) (file, !linenum) !map;
     while
       let nextline = getline() in
       ignore (Str.string_match contin_regex nextline 0);
@@ -2012,10 +2033,11 @@ let report_omitted_prods g seen label split =
         (if first = "" then nt else first), nt, n + 1, total + 1)
     ("", "", 0, 0) !g.order in
   maybe_warn first last n;
-(*    List.iter (fun nt ->
-        if not (NTMap.mem nt seen || (List.mem nt included)) then
-          warn "%s %s not included in .rst files\n" "Nonterminal" nt)
-      !g.order;*)
+  Printf.printf "\n\n";
+  NTMap.iter (fun nt _ ->
+      if not (NTMap.mem nt seen || (List.mem nt included)) then
+        warn "%s %s not included in .rst files\n" "Nonterminal" nt)
+    !g.map;
   if total <> 0 then
     Printf.eprintf "TOTAL %ss not included = %d\n" label total
 
@@ -2078,13 +2100,11 @@ let process_grammar args =
       print_in_order out g `MLG !g.order StringSet.empty;
       close_out out;
       finish_with_file (dir "orderedGrammar") args;
-      check_singletons g
+(*      check_singletons g*)
 (*      print_dominated g*)
-    end;
 
-    let seen = ref { nts=NTMap.empty; tacs=NTMap.empty; tacvs=NTMap.empty; cmds=NTMap.empty; cmdvs=NTMap.empty } in
-    let args = { args with no_update = false } in (* always update rsts in place for now *)
-    if !exit_code = 0 then begin
+      let seen = ref { nts=NTMap.empty; tacs=NTMap.empty; tacvs=NTMap.empty; cmds=NTMap.empty; cmdvs=NTMap.empty } in
+      let args = { args with no_update = false } in (* always update rsts in place for now *)
       let plist nt =
         let list = (List.map (fun t -> String.trim (prod_to_prodn t))
           (NTMap.find nt !g.map)) in
@@ -2095,7 +2115,6 @@ let process_grammar args =
       report_omitted_prods g !seen.nts "Nonterminal" "";
       let out = open_out (dir "updated_rsts") in
       close_out out;
-    end;
 
 (*
       if args.check_tacs then
@@ -2104,7 +2123,6 @@ let process_grammar args =
         report_omitted_prods cmd_list !seen.cmds "Command" "\n                  ";
 *)
 
-    if !exit_code = 0 then begin
       (* generate report on cmds or tacs *)
       let cmdReport outfile cmdStr cmd_nts cmds cmdvs =
         let rstCmds = StringSet.of_list (List.map (fun b -> let c, _ = b in c) (NTMap.bindings cmds)) in
@@ -2113,7 +2131,7 @@ let process_grammar args =
             StringSet.union set (StringSet.of_list (List.map (fun p -> String.trim (prod_to_prodn p)) (NTMap.find nt !prodn_gram.map)))
           ) StringSet.empty cmd_nts in
         let allCmds = StringSet.union rstCmdvs (StringSet.union rstCmds gramCmds) in
-        let out = open_temp_bin (dir outfile) in
+        let out = open_out_bin (dir outfile) in
         StringSet.iter (fun c ->
             let rsts = StringSet.mem c rstCmds in
             let gram = StringSet.mem c gramCmds in
@@ -2127,7 +2145,6 @@ let process_grammar args =
             fprintf out "%s%s  %s\n" pfx var c)
           allCmds;
         close_out out;
-        finish_with_file (dir outfile) args;
         Printf.printf "# %s in rsts, gram, total = %d %d %d\n" cmdStr (StringSet.cardinal gramCmds)
           (StringSet.cardinal rstCmds) (StringSet.cardinal allCmds);
       in
@@ -2139,17 +2156,16 @@ let process_grammar args =
 
       let tac_nts = ["simple_tactic"] in
       if args.check_tacs then
-        cmdReport "prodnTactics" "tacs" tac_nts !seen.tacs !seen.tacvs
-    end;
+        cmdReport "prodnTactics" "tacs" tac_nts !seen.tacs !seen.tacvs;
 
-    (* generate prodnGrammar for reference *)
-    if !exit_code = 0 && not args.verify then begin
-      let out = open_temp_bin (dir "prodnGrammar") in
-      print_in_order out prodn_gram `PRODN !prodn_gram.order StringSet.empty;
-      close_out out;
-      finish_with_file (dir "prodnGrammar") args
-    end
-  end
+      (* generate prodnGrammar for reference *)
+      if not args.verify then begin
+        let out = open_out_bin (dir "prodnGrammar") in
+        print_in_order out prodn_gram `PRODN !prodn_gram.order StringSet.empty;
+        close_out out;
+      end
+    end (* if !exit_code = 0 *)
+  end (* if not args.fullGrammar *)
 
 let parse_args () =
   let suffix_regex = Str.regexp ".*\\.\\([a-z]+\\)$" in
@@ -2179,5 +2195,7 @@ let () =
     if !exit_code = 0 then begin
       process_grammar args
     end;
+    if !error_count > 0 then
+      Printf.eprintf "%d error(s)\n" !error_count;
     exit !exit_code
   (*with _ -> Printexc.print_backtrace stdout; exit 1*)

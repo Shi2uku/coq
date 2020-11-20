@@ -36,9 +36,9 @@ let eq_reloc_info r1 r2 = match r1, r2 with
 | Reloc_annot _, _ -> false
 | Reloc_const c1, Reloc_const c2 -> eq_structured_constant c1 c2
 | Reloc_const _, _ -> false
-| Reloc_getglobal c1, Reloc_getglobal c2 -> Constant.equal c1 c2
+| Reloc_getglobal c1, Reloc_getglobal c2 -> Constant.CanOrd.equal c1 c2
 | Reloc_getglobal _, _ -> false
-| Reloc_proj_name p1, Reloc_proj_name p2 -> Projection.Repr.equal p1 p2
+| Reloc_proj_name p1, Reloc_proj_name p2 -> Projection.Repr.CanOrd.equal p1 p2
 | Reloc_proj_name _, _ -> false
 | Reloc_caml_prim p1, Reloc_caml_prim p2 -> CPrimitives.equal p1 p2
 | Reloc_caml_prim _, _ -> false
@@ -48,8 +48,8 @@ let hash_reloc_info r =
   match r with
   | Reloc_annot sw -> combinesmall 1 (hash_annot_switch sw)
   | Reloc_const c -> combinesmall 2 (hash_structured_constant c)
-  | Reloc_getglobal c -> combinesmall 3 (Constant.hash c)
-  | Reloc_proj_name p -> combinesmall 4 (Projection.Repr.hash p)
+  | Reloc_getglobal c -> combinesmall 3 (Constant.CanOrd.hash c)
+  | Reloc_proj_name p -> combinesmall 4 (Projection.Repr.CanOrd.hash p)
   | Reloc_caml_prim p -> combinesmall 5 (CPrimitives.hash p)
 
 module RelocTable = Hashtbl.Make(struct
@@ -208,14 +208,6 @@ let slot_for_caml_prim env op =
 
 (* Emission of one instruction *)
 
-let nocheck_prim_op = function
-  | Int63add -> opADDINT63
-  | Int63sub -> opSUBINT63
-  | Int63lt  -> opLTINT63
-  | Int63le  -> opLEINT63
-  | _ -> assert false
-
-
 let check_prim_op = function
   | Int63head0     -> opCHECKHEAD0INT63
   | Int63tail0     -> opCHECKTAIL0INT63
@@ -259,23 +251,32 @@ let check_prim_op = function
   | Float64ldshiftexp -> opCHECKLDSHIFTEXP
   | Float64next_up    -> opCHECKNEXTUPFLOAT
   | Float64next_down  -> opCHECKNEXTDOWNFLOAT
-  | Arraymake -> opISINT_CAML_CALL2
-  | Arrayget -> opISARRAY_INT_CAML_CALL2
-  | Arrayset -> opISARRAY_INT_CAML_CALL3
-  | Arraydefault | Arraycopy | Arrayreroot | Arraylength ->
-      opISARRAY_CAML_CALL1
+  | Arraymake -> opCHECKCAMLCALL2_1
+  | Arrayget -> opCHECKCAMLCALL2
+  | Arrayset -> opCHECKCAMLCALL3_1
+  | Arraydefault | Arraycopy | Arraylength ->
+      opCHECKCAMLCALL1
+
+let inplace_prim_op = function
+  | Float64next_up | Float64next_down -> true
+  | _ -> false
+
+let check_prim_op_inplace = function
+  | Float64next_up   -> opCHECKNEXTUPFLOATINPLACE
+  | Float64next_down -> opCHECKNEXTDOWNFLOATINPLACE
+  | _ -> assert false
 
 let emit_instr env = function
   | Klabel lbl -> define_label env lbl
   | Kacc n ->
       if n < 8 then out env(opACC0 + n) else (out env opACC; out_int env n)
   | Kenvacc n ->
-      if n >= 1 && n <= 4
-      then out env(opENVACC1 + n - 1)
+      if n >= 0 && n <= 3
+      then out env(opENVACC0 + n)
       else (out env opENVACC; out_int env n)
   | Koffsetclosure ofs ->
-      if Int.equal ofs (-2) || Int.equal ofs 0 || Int.equal ofs 2
-      then out env (opOFFSETCLOSURE0 + ofs / 2)
+      if Int.equal ofs 0 || Int.equal ofs 1
+      then out env (opOFFSETCLOSURE0 + ofs)
       else (out env opOFFSETCLOSURE; out_int env ofs)
   | Kpush ->
       out env opPUSH
@@ -354,10 +355,7 @@ let emit_instr env = function
   | Kproj p -> out env opPROJ; out_int env (Projection.Repr.arg p); slot_for_proj_name env p
   | Kensurestackcapacity size -> out env opENSURESTACKCAPACITY; out_int env size
   | Kbranch lbl -> out env opBRANCH; out_label env lbl
-  | Kprim (op,None) ->
-      out env (nocheck_prim_op op)
-
-  | Kprim(op,Some (q,_u)) ->
+  | Kprim (op, (q,_u)) ->
       out env (check_prim_op op);
       slot_for_getglobal env q
 
@@ -366,12 +364,7 @@ let emit_instr env = function
     out_label env lbl;
     slot_for_caml_prim env op
 
-  | Kareint 1 -> out env opISINT
-  | Kareint 2 -> out env opAREINT2;
-
   | Kstop -> out env opSTOP
-
-  | Kareint _ -> assert false
 
 (* Emission of a current list and remaining lists of instructions. Include some peephole optimization. *)
 
@@ -385,13 +378,13 @@ let rec emit env insns remaining = match insns with
       if n < 8 then out env(opPUSHACC0 + n) else (out env opPUSHACC; out_int env n);
       emit env c remaining
   | Kpush :: Kenvacc n :: c ->
-      if n >= 1 && n <= 4
-      then out env(opPUSHENVACC1 + n - 1)
+      if n >= 0 && n <= 3
+      then out env(opPUSHENVACC0 + n)
       else (out env opPUSHENVACC; out_int env n);
       emit env c remaining
   | Kpush :: Koffsetclosure ofs :: c ->
-      if Int.equal ofs (-2) || Int.equal ofs 0 || Int.equal ofs 2
-      then out env(opPUSHOFFSETCLOSURE0 + ofs / 2)
+      if Int.equal ofs 0 || Int.equal ofs 1
+      then out env(opPUSHOFFSETCLOSURE0 + ofs)
       else (out env opPUSHOFFSETCLOSURE; out_int env ofs);
       emit env c remaining
   | Kpush :: Kgetglobal id :: c ->
@@ -406,8 +399,14 @@ let rec emit env insns remaining = match insns with
       emit env c remaining
   | Kpop n :: Kjump :: c ->
       out env opRETURN; out_int env n; emit env c remaining
-  | Ksequence(c1,c2)::c ->
-      emit env c1 (c2::c::remaining)
+  | Ksequence c1 :: c ->
+      emit env c1 (c :: remaining)
+  | Kprim (op1, (q1, _)) :: Kprim (op2, (q2, _)) :: c when inplace_prim_op op2 ->
+      out env (check_prim_op op1);
+      slot_for_getglobal env q1;
+      out env (check_prim_op_inplace op2);
+      slot_for_getglobal env q2;
+      emit env c remaining
   (* Default case *)
   | instr :: c ->
       emit_instr env instr; emit env c remaining

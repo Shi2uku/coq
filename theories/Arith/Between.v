@@ -24,6 +24,7 @@ Section Between.
     | bet_emp : between k k
     | bet_S : forall l, between k l -> P l -> between k (S l).
 
+  #[local]
   Hint Constructors between: arith.
 
   Lemma bet_eq : forall k l, l = k -> between k l.
@@ -31,18 +32,21 @@ Section Between.
     intros * ->; auto with arith.
   Qed.
 
+  #[local]
   Hint Resolve bet_eq: arith.
 
   Lemma between_le : forall k l, between k l -> k <= l.
   Proof.
     induction 1; auto with arith.
   Qed.
+  #[local]
   Hint Immediate between_le: arith.
 
   Lemma between_Sk_l : forall k l, between k l -> S k <= l -> between (S k) l.
   Proof.
     induction 1 as [|* [|]]; auto with arith.
   Qed.
+  #[local]
   Hint Resolve between_Sk_l: arith.
 
   Lemma between_restr :
@@ -57,6 +61,7 @@ Section Between.
     | exists_S : forall l, exists_between k l -> exists_between k (S l)
     | exists_le : forall l, k <= l -> Q l -> exists_between k (S l).
 
+  #[local]
   Hint Constructors exists_between: arith.
 
   Lemma exists_le_S : forall k l, exists_between k l -> S k <= l.
@@ -66,12 +71,14 @@ Section Between.
 
   Lemma exists_lt : forall k l, exists_between k l -> k < l.
   Proof exists_le_S.
+  #[local]
   Hint Immediate exists_le_S exists_lt: arith.
 
   Lemma exists_S_le : forall k l, exists_between k (S l) -> k <= l.
   Proof.
     intros; apply le_S_n; auto with arith.
   Qed.
+  #[local]
   Hint Immediate exists_S_le: arith.
 
   Definition in_int p q r := p <= r /\ r < q.
@@ -80,6 +87,7 @@ Section Between.
   Proof.
     split; assumption.
   Qed.
+  #[local]
   Hint Resolve in_int_intro: arith.
 
   Lemma in_int_lt : forall p q r, in_int p q r -> p < q.
@@ -99,18 +107,20 @@ Section Between.
   Proof.
     intros * []; auto with arith.
   Qed.
+  #[local]
   Hint Resolve in_int_S: arith.
 
   Lemma in_int_Sp_q : forall p q r, in_int (S p) q r -> in_int p q r.
   Proof.
     intros * []; auto with arith.
   Qed.
+  #[local]
   Hint Immediate in_int_Sp_q: arith.
 
   Lemma between_in_int :
     forall k l, between k l -> forall r, in_int k l r -> P r.
   Proof.
-    induction 1; intros.
+    intro k; induction 1 as [|l]; intros r ?.
     - absurd (k < k). { auto with arith. }
       eapply in_int_lt; eassumption.
     - destruct (in_int_p_Sq k l r) as [| ->]; auto with arith.
@@ -125,7 +135,7 @@ Section Between.
   Lemma exists_in_int :
     forall k l, exists_between k l -> exists2 m : nat, in_int k l m & Q m.
   Proof.
-    induction 1 as [* ? (p, ?, ?)|].
+    induction 1 as [* ? (p, ?, ?)|l].
     - exists p; auto with arith.
     - exists l; auto with arith.
   Qed.
@@ -154,7 +164,7 @@ Section Between.
       between k l ->
       (forall n:nat, in_int k l n -> P n -> ~ Q n) -> ~ exists_between k l.
   Proof.
-    induction 1; red; intros.
+    intro k; induction 1 as [|l]; red; intros.
     - absurd (k < k); auto with arith.
     - absurd (Q l). { auto with arith. }
       destruct (exists_in_int k (S l)) as (l',[],?).
@@ -188,6 +198,8 @@ Section Between.
 
 End Between.
 
+#[global]
 Hint Resolve nth_O bet_S bet_emp bet_eq between_Sk_l exists_S exists_le
   in_int_S in_int_intro: arith.
+#[global]
 Hint Immediate in_int_Sp_q exists_le_S exists_S_le: arith.

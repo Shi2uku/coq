@@ -5,7 +5,7 @@ Extended pattern matching
 
 :Authors: Cristina Cornes and Hugo Herbelin
 
-This section describes the full form of pattern matching in |Coq| terms.
+This section describes the full form of pattern matching in Coq terms.
 
 .. |rhs| replace:: right hand sides
 
@@ -85,6 +85,13 @@ Irrefutable patterns: the destructuring let variants
 Pattern-matching on terms inhabiting inductive type having only one
 constructor can be alternatively written using :g:`let … in …`
 constructions. There are two variants of them.
+
+.. insertprodn destructuring_let destructuring_let
+
+.. prodn::
+   destructuring_let ::= let ( {*, @name } ) {? {? as @name } return @term100 } := @term in @term
+   | let ' @pattern := @term {? return @term100 } in @term
+   | let ' @pattern in @pattern := @term return @term100 in @term
 
 
 First destructuring let syntax
@@ -187,10 +194,10 @@ Printing nested patterns
    pattern matching into a single pattern matching over a nested
    pattern.
 
-   When this flag is on (default), |Coq|’s printer tries to do such
+   When this flag is on (default), Coq’s printer tries to do such
    limited re-factorization.
-   Turning it off tells |Coq| to print only simple pattern matching problems
-   in the same way as the |Coq| kernel handles them.
+   Turning it off tells Coq to print only simple pattern matching problems
+   in the same way as the Coq kernel handles them.
 
 
 Factorization of clauses with same right-hand side
@@ -200,7 +207,7 @@ Factorization of clauses with same right-hand side
 
    When several patterns share the same right-hand side, it is additionally
    possible to share the clauses using disjunctive patterns. Assuming that the
-   printing matching mode is on, this flag (on by default) tells |Coq|'s
+   printing matching mode is on, this flag (on by default) tells Coq's
    printer to try to do this kind of factorization.
 
 Use of a default clause
@@ -212,7 +219,7 @@ Use of a default clause
    arguments of the patterns, yet an extra factorization is possible: the
    disjunction of patterns can be replaced with a `_` default clause. Assuming that
    the printing matching mode and the factorization mode are on, this flag (on by
-   default) tells |Coq|'s printer to use a default clause when relevant.
+   default) tells Coq's printer to use a default clause when relevant.
 
 Printing of wildcard patterns
 ++++++++++++++++++++++++++++++
@@ -234,7 +241,7 @@ Printing of the elimination predicate
    In most of the cases, the type of the result of a matched term is
    mechanically synthesizable. Especially, if the result type does not
    depend of the matched term. When this flag is on (default),
-   the result type is not printed when |Coq| knows that it can re-
+   the result type is not printed when Coq knows that it can re-
    synthesize it.
 
 
@@ -289,6 +296,43 @@ This example emphasizes what the printing settings offer.
        Unset Printing Wildcard.
 
        Print snd.
+
+Conventions about unused pattern-matching variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Pattern-matching variables that are not used on the right-hand side of ``=>`` are
+considered the sign of a potential error. For instance, it could
+result from an undetected mispelled constant constructor. By default,
+a warning is issued in such situations.
+
+.. warn:: Unused variable @ident catches more than one case.
+
+   This indicates that an unused pattern variable :token:`ident`
+   occurs in a pattern-matching clause used to complete at least two
+   cases of the pattern-matching problem.
+
+   The warning can be deactivated by using a variable name starting
+   with ``_`` or by setting ``Set Warnings
+   "-unused-pattern-matching-variable"``.
+
+   Here is an example where the warning is activated.
+
+   .. example::
+
+      .. coqtop:: none
+
+         Set Warnings "-unused-pattern-matching-variable".
+
+      .. coqtop:: all
+
+         Definition is_zero (o : option nat) := match o with
+         | Some 0 => true
+         | x => false
+         end.
+
+      .. coqtop:: none
+
+         Set Warnings "+unused-pattern-matching-variable".
 
 Patterns
 --------
@@ -879,7 +923,7 @@ generated expression and the original.
 Here is a summary of the error messages corresponding to each
 situation:
 
-.. exn:: The constructor @ident expects @num arguments.
+.. exn:: The constructor @ident expects @natural arguments.
          The variable ident is bound several times in pattern term
          Found a constructor of inductive type term while a constructor of term is expected
 
@@ -890,8 +934,8 @@ situation:
 
    The pattern matching is not exhaustive.
 
-.. exn:: The elimination predicate term should be of arity @num (for non \
-         dependent case) or @num (for dependent case).
+.. exn:: The elimination predicate term should be of arity @natural (for non \
+         dependent case) or @natural (for dependent case).
 
    The elimination predicate provided to match has not the expected arity.
 

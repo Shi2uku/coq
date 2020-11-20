@@ -41,11 +41,11 @@ let classes_transparent_state () =
 let () =
   Hook.set Typeclasses.classes_transparent_state_hook classes_transparent_state
 
-let add_instance_hint inst path ~locality info poly =
+let add_instance_hint inst path ~locality info =
      Flags.silently (fun () ->
        Hints.add_hints ~locality [typeclasses_db]
           (Hints.HintsResolveEntry
-             [info, poly, false, Hints.PathHints path, inst])) ()
+             [info, false, Hints.PathHints path, inst])) ()
 
 let is_local_for_hint i =
   match i.is_global with
@@ -56,16 +56,9 @@ let is_local_for_hint i =
                         itself *)
 
 let add_instance_base inst =
-  let poly = Global.is_polymorphic inst.is_impl in
   let locality = if is_local_for_hint inst then Goptions.OptLocal else Goptions.OptGlobal in
-  add_instance_hint (Hints.IsGlobRef inst.is_impl) [inst.is_impl] ~locality
-    inst.is_info poly;
-  List.iter (fun (path, pri, c) ->
-    let h = Hints.IsConstr (EConstr.of_constr c, Univ.ContextSet.empty) [@ocaml.warning "-3"] in
-    add_instance_hint h path
-                ~locality pri poly)
-    (build_subclasses ~check:(not (isVarRef inst.is_impl))
-       (Global.env ()) (Evd.from_env (Global.env ())) inst.is_impl inst.is_info)
+  add_instance_hint (Hints.hint_globref inst.is_impl) [inst.is_impl] ~locality
+    inst.is_info
 
 let mk_instance cl info glob impl =
   let global =
@@ -159,14 +152,20 @@ let subst_class (subst,cl) =
   and do_subst c = Mod_subst.subst_mps subst c
   and do_subst_gr gr = fst (subst_global subst gr) in
   let do_subst_ctx = List.Smart.map (RelDecl.map_constr do_subst) in
-  let do_subst_context (grs,ctx) =
-    List.Smart.map (Option.Smart.map do_subst_gr) grs,
-    do_subst_ctx ctx in
-  let do_subst_projs projs = List.Smart.map (fun (x, y, z) ->
-    (x, y, Option.Smart.map do_subst_con z)) projs in
+  let do_subst_meth m =
+    let c = Option.Smart.map do_subst_con m.meth_const in
+    if c == m.meth_const then m
+    else
+    {
+      meth_name = m.meth_name;
+      meth_info = m.meth_info;
+      meth_const = c;
+    }
+  in
+  let do_subst_projs projs = List.Smart.map do_subst_meth projs in
   { cl_univs = cl.cl_univs;
     cl_impl = do_subst_gr cl.cl_impl;
-    cl_context = do_subst_context cl.cl_context;
+    cl_context = do_subst_ctx cl.cl_context;
     cl_props = do_subst_ctx cl.cl_props;
     cl_projs = do_subst_projs cl.cl_projs;
     cl_strict = cl.cl_strict;
@@ -195,25 +194,16 @@ let discharge_class (_,cl) =
       | VarRef _ | ConstructRef _ -> assert false
       | ConstRef cst -> Lib.section_segment_of_constant cst
       | IndRef (ind,_) -> Lib.section_segment_of_mutual_inductive ind in
-  let discharge_context ctx' subst (grs, ctx) =
-    let env = Global.env () in
-    let sigma = Evd.from_env env in
-    let grs' =
-      let newgrs = List.map (fun decl ->
-                             match decl |> RelDecl.get_type |> EConstr.of_constr |> class_of_constr env sigma with
-                             | None -> None
-                             | Some (_, ((tc,_), _)) -> Some tc.cl_impl)
-                            ctx'
-      in
-      grs @ newgrs
-    in grs', discharge_rel_context subst 1 ctx @ ctx' in
+  let discharge_context ctx' subst ctx =
+    discharge_rel_context subst 1 ctx @ ctx'
+  in
   try
     let info = abs_context cl in
     let ctx = info.Section.abstr_ctx in
     let ctx, subst = rel_of_variable_context ctx in
     let usubst, cl_univs' = Lib.discharge_abstract_universe_context info cl.cl_univs in
     let context = discharge_context ctx (subst, usubst) cl.cl_context in
-    let props = discharge_rel_context (subst, usubst) (succ (List.length (fst cl.cl_context))) cl.cl_props in
+    let props = discharge_rel_context (subst, usubst) (succ (List.length cl.cl_context)) cl.cl_props in
     let discharge_proj x = x in
     { cl_univs = cl_univs';
       cl_impl = cl.cl_impl;
@@ -248,10 +238,10 @@ let add_class cl =
 
 let add_class env sigma cl =
   add_class cl;
-  List.iter (fun (n, inst, body) ->
-      match inst with
-      | Some (Backward, info) ->
-        (match body with
+  List.iter (fun m ->
+      match m.meth_info with
+      | Some info ->
+        (match m.meth_const with
          | None -> CErrors.user_err Pp.(str "Non-definable projection can not be declared as a subinstance")
          | Some b -> declare_instance ~warn:true env sigma (Some info) false (GlobRef.ConstRef b))
       | _ -> ())
@@ -322,7 +312,7 @@ let declare_instance_constant iinfo global impargs ?hook name udecl poly sigma t
 let do_declare_instance sigma ~global ~poly k u ctx ctx' pri udecl impargs subst name =
   let subst = List.fold_left2
       (fun subst' s decl -> if is_local_assum decl then s :: subst' else subst')
-      [] subst (snd k.cl_context)
+      [] subst k.cl_context
   in
   let (_, ty_constr) = instance_constructor (k,u) subst in
   let termtype = it_mkProd_or_LetIn ty_constr (ctx' @ ctx) in
@@ -397,7 +387,7 @@ let do_instance_subst_constructor_and_ty subst k u ctx =
   let subst =
     List.fold_left2 (fun subst' s decl ->
       if is_local_assum decl then s :: subst' else subst')
-    [] subst (k.cl_props @ snd k.cl_context)
+    [] subst (k.cl_props @ k.cl_context)
   in
   let (app, ty_constr) = instance_constructor (k,u) subst in
   let termtype = it_mkProd_or_LetIn ty_constr ctx in
@@ -431,9 +421,9 @@ let do_instance_type_ctx_instance props k env' ctx' sigma ~program_mode subst =
              let rest' = List.filter (fun v -> not (is_id v)) rest
              in
              let {CAst.loc;v=mid} = get_id loc_mid in
-             List.iter (fun (n, _, x) ->
-                 if Name.equal n (Name mid) then
-                   Option.iter (fun x -> Dumpglob.add_glob ?loc (GlobRef.ConstRef x)) x) k.cl_projs;
+             List.iter (fun m ->
+                 if Name.equal m.meth_name (Name mid) then
+                   Option.iter (fun x -> Dumpglob.add_glob ?loc (GlobRef.ConstRef x)) m.meth_const) k.cl_projs;
              c :: props, rest'
            with Not_found ->
              ((CAst.make @@ CHole (None(* Some Evar_kinds.GoalEvar *), Namegen.IntroAnonymous, None)) :: props), rest
@@ -512,9 +502,16 @@ let do_instance_program ~pm env env' sigma ?hook ~global ~poly cty k u ctx ctx' 
   else
     declare_instance_program pm env sigma ~global ~poly id pri imps decl term termtype
 
-let interp_instance_context ~program_mode env ctx ~generalize pl tclass =
-  let sigma, decl = Constrexpr_ops.interp_univ_decl_opt env pl in
+let auto_generalize =
+  Goptions.declare_bool_option_and_ref
+    ~depr:true
+    ~key:["Instance";"Generalized";"Output"]
+    ~value:false
+
+let interp_instance_context ~program_mode env ctx ?(generalize=auto_generalize()) pl tclass =
+  let sigma, decl = interp_univ_decl_opt env pl in
   let tclass =
+    (* when we remove this code, we can remove the middle argument of CGeneralization *)
     if generalize then CAst.make @@ CGeneralization (Glob_term.MaxImplicit, Some AbsPi, tclass)
     else tclass
   in
@@ -528,7 +525,7 @@ let interp_instance_context ~program_mode env ctx ~generalize pl tclass =
   let u_s = EInstance.kind sigma u in
   let cl = Typeclasses.typeclass_univ_instance (k, u_s) in
   let args = List.map of_constr args in
-  let cl_context = List.map (Termops.map_rel_decl of_constr) (snd cl.cl_context) in
+  let cl_context = List.map (Termops.map_rel_decl of_constr) cl.cl_context in
   let _, args =
     List.fold_right (fun decl (args, args') ->
         match decl with
@@ -540,10 +537,10 @@ let interp_instance_context ~program_mode env ctx ~generalize pl tclass =
   let sigma = resolve_typeclasses ~filter:Typeclasses.all_evars ~fail:true env sigma in
   sigma, cl, u, c', ctx', ctx, imps, args, decl
 
-let new_instance_common ~program_mode ~generalize env instid ctx cl =
+let new_instance_common ~program_mode ?generalize env instid ctx cl =
   let ({CAst.loc;v=instid}, pl) = instid in
   let sigma, k, u, cty, ctx', ctx, imps, subst, decl =
-    interp_instance_context ~program_mode env ~generalize ctx pl cl
+    interp_instance_context ~program_mode env ?generalize ctx pl cl
   in
   (* The name generator should not be here *)
   let id =
@@ -558,20 +555,20 @@ let new_instance_common ~program_mode ~generalize env instid ctx cl =
 
 let new_instance_interactive ?(global=false)
     ~poly instid ctx cl
-    ?(generalize=true) ?(tac:unit Proofview.tactic option) ?hook
+    ?generalize ?(tac:unit Proofview.tactic option) ?hook
     pri opt_props =
   let env = Global.env() in
   let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
-    new_instance_common ~program_mode:false ~generalize env instid ctx cl in
+    new_instance_common ~program_mode:false ?generalize env instid ctx cl in
   id, do_instance_interactive env env' sigma ?hook ~tac ~global ~poly
     cty k u ctx ctx' pri decl imps subst id opt_props
 
 let new_instance_program ?(global=false) ~pm
     ~poly instid ctx cl opt_props
-    ?(generalize=true) ?hook pri =
+    ?generalize ?hook pri =
   let env = Global.env() in
   let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
-    new_instance_common ~program_mode:true ~generalize env instid ctx cl in
+    new_instance_common ~program_mode:true ?generalize env instid ctx cl in
   let pm =
     do_instance_program ~pm env env' sigma ?hook ~global ~poly
       cty k u ctx ctx' pri decl imps subst id opt_props in
@@ -579,10 +576,10 @@ let new_instance_program ?(global=false) ~pm
 
 let new_instance ?(global=false)
     ~poly instid ctx cl props
-    ?(generalize=true) ?hook pri =
+    ?generalize ?hook pri =
   let env = Global.env() in
   let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
-    new_instance_common ~program_mode:false ~generalize env instid ctx cl in
+    new_instance_common ~program_mode:false ?generalize env instid ctx cl in
   do_instance env env' sigma ?hook ~global ~poly
     cty k u ctx ctx' pri decl imps subst id props;
   id

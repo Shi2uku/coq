@@ -124,17 +124,17 @@ Check r 2 3.
 End I.
 
 Require Import Coq.Numbers.Cyclic.Int63.Int63.
-Module NumeralNotations.
+Module NumberNotations.
   Module Test17.
     (** Test int63 *)
     Declare Scope test17_scope.
     Delimit Scope test17_scope with test17.
     Local Set Primitive Projections.
     Record myint63 := of_int { to_int : int }.
-    Numeral Notation myint63 of_int to_int : test17_scope.
+    Number Notation myint63 of_int to_int : test17_scope.
     Check let v := 0%test17 in v : myint63.
   End Test17.
-End NumeralNotations.
+End NumberNotations.
 
 Module K.
 
@@ -313,3 +313,177 @@ Notation "x" := x (in custom com_top at level 90, x custom com at level 90).
 Check fun x => <{ x ; (S x) }>.
 
 End CoercionEntryTransitivity.
+
+(* Some corner cases *)
+
+Module P.
+
+(* Basic rules:
+   - a section variable be used for itself and as a binding variable
+   - a global name cannot be used for itself and as a binding variable
+*)
+
+  Definition pseudo_force {A} (n:A) (P:A -> Prop) := forall n', n' = n -> P n'.
+
+  Module NotationMixedTermBinderAsIdent.
+
+  Notation "▢_ n P" := (pseudo_force n (fun n => P))
+    (at level 0, n ident, P at level 9, format "▢_ n  P").
+  Check exists p, ▢_p (p >= 1).
+  Section S.
+  Variable n:nat.
+  Check ▢_n (n >= 1).
+  End S.
+  Fail Check ▢_nat (nat = bool).
+  Fail Check ▢_O (O >= 1).
+  Axiom n:nat.
+  Fail Check ▢_n (n >= 1).
+
+  End NotationMixedTermBinderAsIdent.
+
+  Module NotationMixedTermBinderAsPattern.
+
+  Notation "▢_ n P" := (pseudo_force n (fun n => P))
+    (at level 0, n pattern, P at level 9, format "▢_ n  P").
+  Check exists x y, ▢_(x,y) (x >= 1 /\ y >= 2).
+  Section S.
+  Variable n:nat.
+  Check ▢_n (n >= 1).
+  End S.
+  Fail Check ▢_nat (nat = bool).
+  Check ▢_tt (tt = tt).
+  Axiom n:nat.
+  Fail Check ▢_n (n >= 1).
+
+  End NotationMixedTermBinderAsPattern.
+
+  Module NotationMixedTermBinderAsStrictPattern.
+
+  Notation "▢_ n P" := (pseudo_force n (fun n => P))
+    (at level 0, n strict pattern, P at level 9, format "▢_ n  P").
+  Check exists x y, ▢_(x,y) (x >= 1 /\ y >= 2).
+  Section S.
+  Variable n:nat.
+  Check ▢_n (n >= 1).
+  End S.
+  Fail Check ▢_nat (nat = bool).
+  Check ▢_tt (tt = tt).
+  Axiom n:nat.
+  Fail Check ▢_n (n >= 1).
+
+  End NotationMixedTermBinderAsStrictPattern.
+
+  Module AbbreviationMixedTermBinderAsStrictPattern.
+
+  Notation myforce n P := (pseudo_force n (fun n => P)).
+  Check exists x y, myforce (x,y) (x >= 1 /\ y >= 2).
+  Section S.
+  Variable n:nat.
+  Check myforce n (n >= 1). (* strict hence not used for printing *)
+  End S.
+  Fail Check myforce nat (nat = bool).
+  Check myforce tt (tt = tt).
+  Axiom n:nat.
+  Fail Check myforce n (n >= 1).
+
+  End AbbreviationMixedTermBinderAsStrictPattern.
+
+  Module Bug4765Part.
+
+  Notation id x := ((fun y => y) x).
+  Check id nat.
+
+  Notation id' x := ((fun x => x) x).
+  Check fun a : bool => id' a.
+  Check fun nat : bool => id' nat.
+  Fail Check id' nat.
+
+  End Bug4765Part.
+
+  Module NotationBinderNotMixedWithTerms.
+
+  Notation "!! x , P" := (forall x, P) (at level 200, x pattern).
+  Check !! nat, nat = true.
+
+  Notation "!!! x , P" := (forall x, P) (at level 200).
+  Check !!! nat, nat = true.
+
+  Notation "!!!! x , P" := (forall x, P) (at level 200, x strict pattern).
+  Check !!!! (nat,id), nat = true /\ id = false.
+
+  End NotationBinderNotMixedWithTerms.
+
+End P.
+
+Module MorePrecise1.
+
+(* A notation with limited iteration is strictly more precise than a
+   notation with unlimited iteration *)
+
+Notation "∀ x .. y , P" := (forall x, .. (forall y, P) ..)
+  (at level 200, x binder, y binder, right associativity,
+  format "'[  ' '[  ' ∀  x  ..  y ']' ,  '/' P ']'") : type_scope.
+
+Check forall x, x = 0.
+
+Notation "∀₁ z , P" := (forall z, P)
+  (at level 200, right associativity) : type_scope.
+
+Check forall x, x = 0.
+
+Notation "∀₂ y x , P" := (forall y x, P)
+  (at level 200, right associativity) : type_scope.
+
+Check forall x, x = 0.
+Check forall x y, x + y = 0.
+
+Notation "(( x , y ))" := (x,y) : core_scope.
+
+Check ((1,2)).
+
+End MorePrecise1.
+
+Module MorePrecise2.
+
+(* Case of a bound binder *)
+Notation "%% [ x == y ]" := (forall x, S x = y) (at level 0, x pattern, y at level 60).
+
+(* Case of an internal binder *)
+Notation "%%% [ y ]" := (forall x : nat, x = y) (at level 0).
+
+(* Check that the two previous notations are indeed finer *)
+Notation "∀ x .. y , P" := (forall x, .. (forall y, P) ..)
+  (at level 200, x binder, y binder, right associativity,
+  format "'[  ' '[  ' ∀  x  ..  y ']' ,  '/' P ']'").
+Notation "∀' x .. y , P" := (forall y, .. (forall x, P) ..)
+  (at level 200, x binder, y binder, right associativity,
+  format "'[  ' '[  ' ∀'  x  ..  y ']' ,  '/' P ']'").
+
+Check %% [x == 1].
+Check %%% [1].
+
+Notation "[[ x ]]" := (pair 1 x).
+
+Notation "( x ; y ; .. ; z )" := (pair .. (pair x y) .. z).
+Notation "[ x ; y ; .. ; z ]" := (pair .. (pair x z) .. y).
+
+(* Check which is finer *)
+Check [[ 2 ]].
+
+End MorePrecise2.
+
+Module MorePrecise3.
+
+(* This is about a binder not bound in a notation being strictly more
+   precise than a binder bound in the notation (since the notation
+   applies - a priori - stricly less often) *)
+
+Notation "%%%" := (forall x, x) (at level 0).
+
+Notation "∀ x .. y , P" := (forall x, .. (forall y, P) ..)
+  (at level 200, x binder, y binder, right associativity,
+  format "'[  ' '[  ' ∀  x  ..  y ']' ,  '/' P ']'").
+
+Check %%%.
+
+End MorePrecise3.

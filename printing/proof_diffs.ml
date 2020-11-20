@@ -252,6 +252,9 @@ let pp_of_type env sigma ty =
 let pr_leconstr_env ?lax ?inctx ?scope env sigma t =
   Ppconstr.pr_lconstr_expr env sigma (Constrextern.extern_constr ?lax ?inctx ?scope env sigma t)
 
+let pr_econstr_env ?lax ?inctx ?scope env sigma t =
+  Ppconstr.pr_constr_expr env sigma (Constrextern.extern_constr ?lax ?inctx ?scope env sigma t)
+
 let pr_lconstr_env ?lax ?inctx ?scope env sigma c =
   pr_leconstr_env ?lax ?inctx ?scope env sigma (EConstr.of_constr c)
 
@@ -511,12 +514,12 @@ let match_goals ot nt =
     | CHole (k,naming,solve), CHole (k2,naming2,solve2) -> ()
     | CPatVar _, CPatVar _ -> ()
     | CEvar (n,l), CEvar (n2,l2) ->
-      let oevar = if ogname = "" then Id.to_string n else ogname in
-      nevar_to_oevar := CString.Map.add (Id.to_string n2) oevar !nevar_to_oevar;
+      let oevar = if ogname = "" then Id.to_string n.CAst.v else ogname in
+      nevar_to_oevar := CString.Map.add (Id.to_string n2.CAst.v) oevar !nevar_to_oevar;
       iter2  (fun x x2 -> let (_, g) = x and (_, g2) = x2 in constr_expr ogname g g2)  l l2
     | CEvar (n,l), nt' ->
       (* pass down the old goal evar name *)
-      match_goals_r (Id.to_string n) nt' nt'
+      match_goals_r (Id.to_string n.CAst.v) nt' nt'
     | CSort s, CSort s2 -> ()
     | CCast (c,c'), CCast (c2,c'2) ->
       constr_expr ogname c c2;
@@ -660,3 +663,22 @@ let make_goal_map op np =
   let ng_to_og = make_goal_map_i op np in
   (*db_goal_map op np ng_to_og;*)
   ng_to_og
+
+let diff_proofs ~diff_opt ?old proof =
+  let pp_proof p =
+    let sigma, env = Proof.get_proof_context p in
+    let pprf = Proof.partial_proof p in
+    Pp.prlist_with_sep Pp.fnl (pr_econstr_env env sigma) pprf in
+  match diff_opt with
+  | DiffOff -> pp_proof proof
+  | _ -> begin
+      try
+        let n_pp = pp_proof proof in
+        let o_pp = match old with
+          | None -> Pp.mt()
+          | Some old -> pp_proof old in
+        let show_removed = Some (diff_opt = DiffRemoved) in
+        Pp_diff.diff_pp_combined ~tokenize_string ?show_removed o_pp n_pp
+      with
+      | Pp_diff.Diff_Failure msg -> Pp.str msg
+    end

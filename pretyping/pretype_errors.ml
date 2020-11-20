@@ -20,6 +20,7 @@ type unification_error =
   | NotSameHead
   | NoCanonicalStructure
   | ConversionFailed of env * constr * constr (* Non convertible closed terms *)
+  | IncompatibleInstances of env * existential * constr * constr
   | MetaOccurInBody of Evar.t
   | InstanceNotSameType of Evar.t * env * types * types
   | UnifUnivInconsistency of Univ.univ_inconsistency
@@ -47,7 +48,7 @@ type pretype_error =
   | CannotUnifyBindingType of constr * constr
   | CannotGeneralize of constr
   | NoOccurrenceFound of constr * Id.t option
-  | CannotFindWellTypedAbstraction of constr * constr list * (env * type_error) option
+  | CannotFindWellTypedAbstraction of constr * constr list * (env * pretype_error) option
   | WrongAbstractionType of Name.t * constr * types * types
   | AbstractionOverMeta of Name.t * Name.t
   | NonLinearUnification of Name.t * constr

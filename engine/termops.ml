@@ -233,13 +233,13 @@ let pr_evar_universe_context ctx =
   if UState.is_empty ctx then mt ()
   else
     (str"UNIVERSES:"++brk(0,1)++
-       h 0 (Univ.pr_universe_context_set prl (UState.context_set ctx)) ++ fnl () ++
+       h (Univ.pr_universe_context_set prl (UState.context_set ctx)) ++ fnl () ++
      str"ALGEBRAIC UNIVERSES:"++brk(0,1)++
-     h 0 (Univ.LSet.pr prl (UState.algebraics ctx)) ++ fnl() ++
+     h (Univ.LSet.pr prl (UState.algebraics ctx)) ++ fnl() ++
      str"UNDEFINED UNIVERSES:"++brk(0,1)++
-     h 0 (UnivSubst.pr_universe_opt_subst (UState.subst ctx)) ++ fnl() ++
+     h (UnivSubst.pr_universe_opt_subst (UState.subst ctx)) ++ fnl() ++
      str "WEAK CONSTRAINTS:"++brk(0,1)++
-     h 0 (UState.pr_weak prl ctx) ++ fnl ())
+     h (UState.pr_weak prl ctx) ++ fnl ())
 
 let print_env_short env sigma =
   let print_constr = print_kconstr in
@@ -310,20 +310,20 @@ let pr_evar_map_gen with_univs pr_evars env sigma =
 
 let pr_evar_list env sigma l =
   let open Evd in
-  let pr_restrict ev =
-    match is_restricted_evar sigma ev with
+  let pr_alias ev =
+    match is_aliased_evar sigma ev with
     | None -> mt ()
-    | Some ev' -> str " (restricted to " ++ Evar.print ev' ++ str ")"
+    | Some ev' -> str " (aliased to " ++ Evar.print ev' ++ str ")"
   in
   let pr (ev, evi) =
-    h 0 (Evar.print ev ++
+    h (Evar.print ev ++
       str "==" ++ pr_evar_info env sigma evi ++
-      pr_restrict ev ++
+      pr_alias ev ++
       (if evi.evar_body == Evar_empty
        then str " {" ++ pr_existential_key sigma ev ++ str "}"
        else mt ()))
   in
-  h 0 (prlist_with_sep fnl pr l)
+  hv 0 (prlist_with_sep fnl pr l)
 
 let to_list d =
   let open Evd in
@@ -1145,9 +1145,9 @@ let compare_constr_univ sigma f cv_pb t1 t2 =
       Sort s1, Sort s2 -> base_sort_cmp cv_pb (ESorts.kind sigma s1) (ESorts.kind sigma s2)
     | Prod (_,t1,c1), Prod (_,t2,c2) ->
         f Reduction.CONV t1 t2 && f cv_pb c1 c2
-    | Const (c, u), Const (c', u') -> Constant.equal c c'
-    | Ind (i, _), Ind (i', _) -> eq_ind i i'
-    | Construct (i, _), Construct (i', _) -> eq_constructor i i'
+    | Const (c, u), Const (c', u') -> Constant.CanOrd.equal c c'
+    | Ind (i, _), Ind (i', _) -> Ind.CanOrd.equal i i'
+    | Construct (i, _), Construct (i', _) -> Construct.CanOrd.equal i i'
     | _ -> EConstr.compare_constr sigma (fun t1 t2 -> f Reduction.CONV t1 t2) t1 t2
 
 let constr_cmp sigma cv_pb t1 t2 =

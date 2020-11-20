@@ -204,7 +204,8 @@ exception NoProgress
 (*      comparison can be much faster than the HO one.          *)
 
 let unif_EQ env sigma p c =
-  let evars = existential_opt_value0 sigma, Evd.universes sigma in
+  let env = Environ.set_universes (Evd.universes sigma) env in
+  let evars = existential_opt_value0 sigma in
   try let _ = Reduction.conv env p ~evars c in true with _ -> false
 
 let unif_EQ_args env sigma pa a =
@@ -453,7 +454,7 @@ let ungen_upat lhs (sigma, uc, t) u =
 
 let nb_cs_proj_args pc f u =
   let na k =
-    List.length (snd (lookup_canonical_conversion (GlobRef.ConstRef pc, k))).o_TCOMPS in
+    List.length (snd (lookup_canonical_conversion (Global.env()) (GlobRef.ConstRef pc, k))).o_TCOMPS in
   let nargs_of_proj t = match kind t with
       | App(_,args) -> Array.length args
       | Proj _ -> 0 (* if splay_app calls expand_projection, this has to be
@@ -462,8 +463,8 @@ let nb_cs_proj_args pc f u =
   try match kind f with
   | Prod _ -> na Prod_cs
   | Sort s -> na (Sort_cs (Sorts.family s))
-  | Const (c',_) when Constant.equal c' pc -> nargs_of_proj u.up_f
-  | Proj (c',_) when Constant.equal (Projection.constant c') pc -> nargs_of_proj u.up_f
+  | Const (c',_) when Constant.CanOrd.equal c' pc -> nargs_of_proj u.up_f
+  | Proj (c',_) when Constant.CanOrd.equal (Projection.constant c') pc -> nargs_of_proj u.up_f
   | Var _ | Ind _ | Construct _ | Const _ -> na (Const_cs (fst @@ destRef f))
   | _ -> -1
   with Not_found -> -1
@@ -507,7 +508,7 @@ let filter_upat i0 f n u fpats =
   let () = if !i0 < np then i0 := n in (u, np) :: fpats
 
 let eq_prim_proj c t = match kind t with
-  | Proj(p,_) -> Constant.equal (Projection.constant p) c
+  | Proj(p,_) -> Constant.CanOrd.equal (Projection.constant p) c
   | _ -> false
 
 let filter_upat_FO i0 f n u fpats =

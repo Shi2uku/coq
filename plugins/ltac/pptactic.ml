@@ -179,7 +179,7 @@ let string_of_genarg_arg (ArgumentType arg) =
     | ConstrTypeOf c ->
       hov 1 (keyword "type of" ++ spc() ++ prc env sigma c)
     | ConstrTerm c when test c ->
-      h 0 (str "(" ++ prc env sigma c ++ str ")")
+      h (str "(" ++ prc env sigma c ++ str ")")
     | ConstrTerm c ->
       prc env sigma c
 
@@ -338,8 +338,8 @@ let string_of_genarg_arg (ArgumentType arg) =
   | Extend.Uentryl (_, l) -> prtac LevelSome arg
   | _ ->
     match arg with
-    | TacGeneric arg ->
-      let pr l arg = prtac l (TacGeneric arg) in
+    | TacGeneric (isquot,arg) ->
+      let pr l arg = prtac l (TacGeneric (isquot,arg)) in
       pr_any_arg pr symb arg
     | _ -> str "ltac:(" ++ prtac LevelSome arg ++ str ")"
 
@@ -571,7 +571,7 @@ let pr_goal_selector ~toplevel s =
 
   let pr_let_clause k pr_gen pr_arg (na,(bl,t)) =
     let pr = function
-      | TacGeneric arg ->
+      | TacGeneric (_,arg) ->
          let name = string_of_genarg_arg (genarg_tag arg) in
          if name = "unit" || name = "int" then
            (* Hard-wired parsing rules *)
@@ -1049,8 +1049,9 @@ let pr_goal_selector ~toplevel s =
               pr_may_eval env sigma pr.pr_constr pr.pr_lconstr pr.pr_constant pr.pr_pattern c, leval
             | TacArg { CAst.v=TacFreshId l } ->
               primitive "fresh" ++ pr_fresh_ids l, latom
-            | TacArg { CAst.v=TacGeneric arg } ->
-              pr.pr_generic env sigma arg, latom
+            | TacArg { CAst.v=TacGeneric (isquot,arg) } ->
+              let p = pr.pr_generic env sigma arg in
+              (match isquot with Some name -> str name ++ str ":(" ++ p ++ str ")" | None -> p), latom
             | TacArg { CAst.v=TacCall {CAst.v=(f,[])} } ->
               pr.pr_reference f, latom
             | TacArg { CAst.v=TacCall {CAst.loc; v=(f,l)} } ->
@@ -1134,8 +1135,8 @@ let pr_goal_selector ~toplevel s =
         pr_dconstr = (fun env sigma -> pr_and_constr_expr (pr_glob_constr_env env));
         pr_lconstr = (fun env sigma -> pr_and_constr_expr (pr_lglob_constr_env env));
         pr_pattern = (fun env sigma -> pr_pat_and_constr_expr (pr_glob_constr_env env));
-        pr_lpattern = (fun env sigma -> pr_pat_and_constr_expr (pr_lglob_constr_env env));
         pr_constant = pr_or_var (pr_and_short_name (pr_evaluable_reference_env env));
+        pr_lpattern = (fun env sigma -> pr_pat_and_constr_expr (pr_lglob_constr_env env));
         pr_reference = pr_ltac_or_var (pr_located pr_ltac_constant);
         pr_name = pr_lident;
         pr_generic = Pputils.pr_glb_generic;
@@ -1322,7 +1323,7 @@ let () =
   register_basic_print0 wit_smart_global
     (pr_or_by_notation pr_qualid) (pr_or_var (pr_located pr_global)) pr_global;
   register_basic_print0 wit_ident pr_id pr_id pr_id;
-  register_basic_print0 wit_var pr_lident pr_lident pr_id;
+  register_basic_print0 wit_hyp pr_lident pr_lident pr_id;
   register_print0 wit_intropattern pr_raw_intro_pattern pr_glob_intro_pattern pr_intro_pattern_env [@warning "-3"];
   register_print0 wit_simple_intropattern pr_raw_intro_pattern pr_glob_intro_pattern pr_intro_pattern_env;
   Genprint.register_print0
@@ -1333,8 +1334,8 @@ let () =
   ;
   Genprint.register_print0
     wit_constr
-    (lift_env Ppconstr.pr_lconstr_expr)
-    (lift_env (fun env sigma (c, _) -> pr_lglob_constr_pptac env sigma c))
+    (lift_env Ppconstr.pr_constr_expr)
+    (lift_env (fun env sigma (c, _) -> pr_glob_constr_pptac env sigma c))
     (make_constr_printer Printer.pr_econstr_n_env)
   ;
   Genprint.register_print0

@@ -1,5 +1,5 @@
 Writing Coq libraries and plugins
-=================================
+===================================
 
 This section presents the part of the Coq language that is useful only
 to library and plugin authors.  A tutorial for writing Coq plugins is

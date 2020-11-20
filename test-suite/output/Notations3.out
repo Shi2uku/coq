@@ -120,14 +120,14 @@ where
 letpair x [1] = {0};
 return (1, 2, 3, 4)
      : nat * nat * nat * nat
-{{ 1 | 1 // 1 }}
-     : nat
-!!! _ _ : nat, True
-     : (nat -> Prop) * ((nat -> Prop) * Prop)
 ((*1).2).3
      : nat
 *(1.2)
      : nat
+{{ 1 | 1 // 1 }}
+     : nat
+!!! _ _ : nat, True
+     : (nat -> Prop) * ((nat -> Prop) * Prop)
 ! '{{x, y}}, x.y = 0
      : Prop
 exists x : nat,
@@ -231,16 +231,13 @@ fun l : list nat => match l with
      : list nat -> list nat
 
 Arguments foo _%list_scope
-Notation
-"'exists' x .. y , p" := ex (fun x => .. (ex (fun y => p)) ..) : type_scope
-(default interpretation)
-"'exists' ! x .. y , p" := ex
-                             (unique
-                                (fun x => .. (ex (unique (fun y => p))) ..))
-: type_scope (default interpretation)
-Notation
-"( x , y , .. , z )" := pair .. (pair x y) .. z : core_scope
-(default interpretation)
+Notation "'exists' x .. y , p" := (ex (fun x => .. (ex (fun y => p)) ..))
+  : type_scope (default interpretation)
+Notation "'exists' ! x .. y , p" :=
+  (ex (unique (fun x => .. (ex (unique (fun y => p))) ..))) : type_scope
+  (default interpretation)
+Notation "( x , y , .. , z )" := (pair .. (pair x y) .. z) : core_scope
+  (default interpretation)
 1 subgoal
   
   ============================
@@ -252,3 +249,5 @@ myfoo01 tt
      : nat
 myfoo01 tt
      : nat
+1 ⪯ 2 ⪯ 3 ⪯ 4
+     : Prop

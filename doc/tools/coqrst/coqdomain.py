@@ -351,7 +351,7 @@ class TacticObject(NotationObject):
 
     Example::
 
-       .. tacn:: do @num @expr
+       .. tacn:: do @natural @expr
 
           :token:`expr` is evaluated to ``v`` which must be a tactic value. …
     """
@@ -401,7 +401,7 @@ class OptionObject(NotationObject):
 
     Example::
 
-       .. opt:: Hyps Limit @num
+       .. opt:: Hyps Limit @natural
           :name Hyps Limit
 
           Controls the maximum number of hypotheses displayed in goals after
@@ -452,7 +452,7 @@ class ProductionObject(CoqObject):
 
     Example::
 
-        .. prodn:: occ_switch ::= { {? {| + | - } } {* @num } }
+        .. prodn:: occ_switch ::= { {? {| + | - } } {* @natural } }
         term += let: @pattern := @term in @term
         | second_production
 
@@ -1169,7 +1169,7 @@ class StdGlossaryIndex(Index):
         return content, False
 
 def GrammarProductionRole(typ, rawtext, text, lineno, inliner, options={}, content=[]):
-    """A grammar production not included in a ``productionlist`` directive.
+    """A grammar production not included in a ``prodn`` directive.
 
     Useful to informally introduce a production, as part of running text.
 
@@ -1177,10 +1177,8 @@ def GrammarProductionRole(typ, rawtext, text, lineno, inliner, options={}, conte
 
        :production:`string` indicates a quoted string.
 
-    You're not likely to use this role very commonly; instead, use a
-    `production list
-    <http://www.sphinx-doc.org/en/stable/markup/para.html#directive-productionlist>`_
-    and reference its tokens using ``:token:`…```.
+    You're not likely to use this role very commonly; instead, use a ``prodn``
+    directive and reference its tokens using ``:token:`…```.
     """
     #pylint: disable=dangerous-default-value, unused-argument
     env = inliner.document.settings.env
@@ -1426,11 +1424,11 @@ def setup(app):
     app.connect('doctree-resolved', CoqtopBlocksTransform.merge_consecutive_coqtop_blocks)
 
     # Add extra styles
-    app.add_stylesheet("ansi.css")
-    app.add_stylesheet("coqdoc.css")
-    app.add_javascript("notations.js")
-    app.add_stylesheet("notations.css")
-    app.add_stylesheet("pre-text.css")
+    app.add_css_file("ansi.css")
+    app.add_css_file("coqdoc.css")
+    app.add_js_file("notations.js")
+    app.add_css_file("notations.css")
+    app.add_css_file("pre-text.css")
 
     # Tell Sphinx about extra settings
     app.add_config_value("report_undocumented_coq_objects", None, 'env')

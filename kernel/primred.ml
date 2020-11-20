@@ -12,11 +12,11 @@ type _ action_kind =
 type exn += IncompatibleDeclarations : 'a action_kind * 'a * 'a -> exn
 
 let check_same_types typ c1 c2 =
-  if not (Constant.equal c1 c2)
+  if not (Constant.CanOrd.equal c1 c2)
   then raise (IncompatibleDeclarations (IncompatTypes typ, c1, c2))
 
 let check_same_inds ind i1 i2 =
-  if not (eq_ind i1 i2)
+  if not (Ind.CanOrd.equal i1 i2)
   then raise (IncompatibleDeclarations (IncompatInd ind, i1, i2))
 
 let add_retroknowledge retro action =
@@ -365,11 +365,6 @@ struct
       let t = get_parray evd args 1 in
       let t' = Parray.copy t in
       E.mkArray env u t' ty
-    | Arrayreroot ->
-      let ar = E.get args 1 in
-      let t = E.get_parray evd ar in
-      let _ = Parray.reroot t in
-      ar
     | Arraylength ->
       let t = get_parray evd args 1 in
       E.mkInt env (Parray.length t)

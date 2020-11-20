@@ -1,5 +1,42 @@
 ## Changes between Coq 8.12 and Coq 8.13
 
+### Code formatting
+
+- The automatic code formatting tool `ocamlformat` has been disabled and its
+  git hook removed. If desired, automatic formatting can be achieved by calling
+  the `fmt` target of the dune build system.
+
+### ML API
+
+Abstract syntax of tactic:
+
+- TacGeneric now takes an argument to tell if it comes from a
+  notation. Use `None` if not and `Some foo` to tell to print such
+  TacGeneric surrounded with `foo:( )`.
+
+Printing functions:
+
+- `Pp.h` does not take a `int` argument anymore (the argument was
+  not used). In general, where `h n` for `n` non zero was used, `hv n`
+  was instead intended. If cancelling the breaking role of cuts in the
+  box was intended, turn `h n c` into `h c`.
+
+Grammar entries:
+
+- `Prim.pattern_identref` is deprecated, use `Prim.pattern_ident`
+  which now returns a located identifier.
+
+Generic arguments:
+
+- Generic arguments: `wit_var` is deprecated, use `wit_hyp`.
+
+Dumpglob:
+
+- The function `Dumpglob.pause` and `Dumpglob.continue` are replaced
+  by `Dumpglob.push_output` and `Dumpglob.pop_output`. This allows
+  plugins to temporarily change/pause the output of Dumpglob, and then
+  restore it to the original setting.
+
 ## Changes between Coq 8.11 and Coq 8.12
 
 ### Code formatting

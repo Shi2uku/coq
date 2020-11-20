@@ -61,15 +61,15 @@ let pr_registered_grammar name =
     prlist pr_one entries
 
 let pr_grammar = function
-  | "constr" | "operconstr" | "binder_constr" ->
+  | "constr" | "term" | "binder_constr" ->
       str "Entry constr is" ++ fnl () ++
       pr_entry Pcoq.Constr.constr ++
       str "and lconstr is" ++ fnl () ++
       pr_entry Pcoq.Constr.lconstr ++
       str "where binder_constr is" ++ fnl () ++
       pr_entry Pcoq.Constr.binder_constr ++
-      str "and operconstr is" ++ fnl () ++
-      pr_entry Pcoq.Constr.operconstr
+      str "and term is" ++ fnl () ++
+      pr_entry Pcoq.Constr.term
   | "pattern" ->
       pr_entry Pcoq.Constr.pattern
   | "vernac" ->
@@ -85,7 +85,7 @@ let pr_grammar = function
       pr_entry Pvernac.Vernac_.gallina_ext
   | name -> pr_registered_grammar name
 
-let pr_custom_grammar name = pr_registered_grammar ("constr:"^name)
+let pr_custom_grammar name = pr_registered_grammar ("custom:"^name)
 
 (**********************************************************************)
 (* Parse a format (every terminal starting with a letter or a single
@@ -194,52 +194,6 @@ let parse_format ({CAst.loc;v=str} : lstring) =
 (***********************)
 (* Analyzing notations *)
 
-(* Interpret notations with a recursive component *)
-
-let out_nt = function NonTerminal x -> x | _ -> assert false
-
-let msg_expected_form_of_recursive_notation =
-  "In the notation, the special symbol \"..\" must occur in\na configuration of the form \"x symbs .. symbs y\"."
-
-let rec find_pattern nt xl = function
-  | Break n as x :: l, Break n' :: l' when Int.equal n n' ->
-      find_pattern nt (x::xl) (l,l')
-  | Terminal s as x :: l, Terminal s' :: l' when String.equal s s' ->
-      find_pattern nt (x::xl) (l,l')
-  | [], NonTerminal x' :: l' ->
-      (out_nt nt,x',List.rev xl),l'
-  | _, Break s :: _ | Break s :: _, _ ->
-      user_err Pp.(str ("A break occurs on one side of \"..\" but not on the other side."))
-  | _, Terminal s :: _ | Terminal s :: _, _ ->
-      user_err ~hdr:"Metasyntax.find_pattern"
-        (str "The token \"" ++ str s ++ str "\" occurs on one side of \"..\" but not on the other side.")
-  | _, [] ->
-      user_err Pp.(str msg_expected_form_of_recursive_notation)
-  | ((SProdList _ | NonTerminal _) :: _), _ | _, (SProdList _ :: _) ->
-      anomaly (Pp.str "Only Terminal or Break expected on left, non-SProdList on right.")
-
-let rec interp_list_parser hd = function
-  | [] -> [], List.rev hd
-  | NonTerminal id :: tl when Id.equal id ldots_var ->
-      if List.is_empty hd then user_err Pp.(str msg_expected_form_of_recursive_notation);
-      let hd = List.rev hd in
-      let ((x,y,sl),tl') = find_pattern (List.hd hd) [] (List.tl hd,tl) in
-      let xyl,tl'' = interp_list_parser [] tl' in
-      (* We remember each pair of variable denoting a recursive part to *)
-      (* remove the second copy of it afterwards *)
-      (x,y)::xyl, SProdList (x,sl) :: tl''
-  | (Terminal _ | Break _) as s :: tl ->
-      if List.is_empty hd then
-        let yl,tl' = interp_list_parser [] tl in
-        yl, s :: tl'
-      else
-        interp_list_parser (s::hd) tl
-  | NonTerminal _ as x :: tl ->
-      let xyl,tl' = interp_list_parser [x] tl in
-      xyl, List.rev_append hd tl'
-  | SProdList _ :: _ -> anomaly (Pp.str "Unexpected SProdList in interp_list_parser.")
-
-
 (* Find non-terminal tokens of notation *)
 
 (* To protect alphabetic tokens and quotes from being seen as variables *)
@@ -256,24 +210,16 @@ let is_numeral_in_constr entry symbs =
   | _ ->
       false
 
-let rec get_notation_vars onlyprint = function
-  | [] -> []
-  | NonTerminal id :: sl ->
-      let vars = get_notation_vars onlyprint sl in
-      if Id.equal id ldots_var then vars else
-        (* don't check for nonlinearity if printing only, see Bug 5526 *)
-        if not onlyprint && Id.List.mem id vars then
-          user_err ~hdr:"Metasyntax.get_notation_vars"
-            (str "Variable " ++ Id.print id ++ str " occurs more than once.")
-        else id::vars
-  | (Terminal _ | Break _) :: sl -> get_notation_vars onlyprint sl
-  | SProdList _ :: _ -> assert false
-
-let analyze_notation_tokens ~onlyprint ntn =
-  let l = decompose_raw_notation ntn in
-  let vars = get_notation_vars onlyprint l in
-  let recvars,l = interp_list_parser [] l in
-  recvars, List.subtract Id.equal vars (List.map snd recvars), l
+let analyze_notation_tokens ~onlyprint df =
+  let (recvars,mainvars,symbols as res) = decompose_raw_notation df in
+    (* don't check for nonlinearity if printing only, see Bug 5526 *)
+  (if not onlyprint then
+    match List.duplicates Id.equal (mainvars @ List.map snd recvars) with
+    | id :: _ ->
+        user_err ~hdr:"Metasyntax.get_notation_vars"
+          (str "Variable " ++ Id.print id ++ str " occurs more than once.")
+    | _ -> ());
+  res
 
 let error_not_same_scope x y =
   user_err ~hdr:"Metasyntax.error_not_name_scope"
@@ -1042,6 +988,13 @@ let interp_non_syntax_modifiers mods =
   in
   List.fold_left (fun st modif -> Option.bind st @@ set modif) (Some (false,false,InConstrEntry)) mods
 
+(* Check if an interpretation can be used for printing a cases printing *)
+let has_no_binders_type =
+  List.for_all (fun (_,(_,typ)) ->
+  match typ with
+  | NtnTypeBinder _ | NtnTypeBinderList -> false
+  | NtnTypeConstr | NtnTypeConstrList -> true)
+
 (* Compute precedences from modifiers (or find default ones) *)
 
 let set_entry_type from n etyps (x,typ) =
@@ -1107,8 +1060,14 @@ let make_interpretation_type isrec isonlybinding default_if_binding = function
      if isrec then NtnTypeBinderList
      else anomaly Pp.(str "Type binder is only for use in recursive notations for binders.")
 
-let subentry_of_constr_prod_entry = function
-  | ETConstr (InCustomEntry s,_,(NumLevel n,_)) -> InCustomEntryLevel (s,n)
+let subentry_of_constr_prod_entry from_level = function
+  (* Specific 8.2 approximation *)
+  | ETConstr (InCustomEntry s,_,x) ->
+    let n = match fst (precedence_of_position_and_level from_level x) with
+     | LevelLt n -> n-1
+     | LevelLe n -> n
+     | LevelSome -> max_int in
+    InCustomEntryLevel (s,n)
   (* level and use of parentheses for coercion is hard-wired for "constr";
      we don't remember the level *)
   | ETConstr (InConstrEntry,_,_) -> InConstrEntrySomeLevel
@@ -1116,7 +1075,7 @@ let subentry_of_constr_prod_entry = function
 
 let make_interpretation_vars
   (* For binders, default is to parse only as an ident *) ?(default_if_binding=AsIdent)
-   recvars allvars typs =
+   recvars level allvars typs =
   let eq_subscope (sc1, l1) (sc2, l2) =
     Option.equal String.equal sc1 sc2 &&
     List.equal String.equal l1 l2
@@ -1132,7 +1091,7 @@ let make_interpretation_vars
     Id.Map.filter (fun x _ -> not (Id.List.mem x useless_recvars)) allvars in
   Id.Map.mapi (fun x (isonlybinding, sc) ->
     let typ = Id.List.assoc x typs in
-    ((subentry_of_constr_prod_entry typ,sc),
+    ((subentry_of_constr_prod_entry level typ,sc),
      make_interpretation_type (Id.List.mem_assoc x recvars) isonlybinding default_if_binding typ)) mainvars
 
 let check_rule_productivity l =
@@ -1159,18 +1118,13 @@ let warn_non_reversible_notation =
              str " not occur in the right-hand side." ++ spc() ++
              strbrk "The notation will not be used for printing as it is not reversible.")
 
-type entry_coercion_kind =
-  | IsEntryCoercion of notation_entry_level
-  | IsEntryGlobal of string * int
-  | IsEntryIdent of string * int
-
 let is_coercion level typs =
   match level, typs with
   | Some (custom,n,_), [e] ->
      (match e, custom with
      | ETConstr _, _ ->
          let customkey = make_notation_entry_level custom n in
-         let subentry = subentry_of_constr_prod_entry e in
+         let subentry = subentry_of_constr_prod_entry n e in
          if notation_entry_level_eq subentry customkey then None
          else Some (IsEntryCoercion subentry)
      | ETGlobal, InCustomEntry s -> Some (IsEntryGlobal (s,n))
@@ -1225,6 +1179,9 @@ let find_precedence custom lev etyps symbols onlyprint =
             | _ ->
               user_err Pp.(str "A notation starting with an atomic expression must be at level 0.")
             end
+        | (ETPattern _ | ETBinder _), InConstrEntry when not onlyprint ->
+            (* Don't know exactly if we can make sense of this case *)
+            user_err Pp.(str "Binders or patterns not supported in leftmost position.")
         | (ETPattern _ | ETBinder _ | ETConstr _), _ ->
             (* Give a default ? *)
             if Option.is_empty lev then
@@ -1411,11 +1368,11 @@ type notation_obj = {
   notobj_scope : scope_name option;
   notobj_interp : interpretation;
   notobj_coercion : entry_coercion_kind option;
-  notobj_onlyparse : bool;
-  notobj_onlyprint : bool;
+  notobj_use : notation_use option;
   notobj_deprecation : Deprecation.t option;
   notobj_notation : notation * notation_location;
   notobj_specific_pp_rules : syntax_printing_extension option;
+  notobj_also_in_cases_pattern : bool;
 }
 
 let load_notation_common silently_define_scope_if_undefined _ (_, nobj) =
@@ -1436,37 +1393,20 @@ let open_notation i (_, nobj) =
     let scope = nobj.notobj_scope in
     let (ntn, df) = nobj.notobj_notation in
     let pat = nobj.notobj_interp in
-    let onlyprint = nobj.notobj_onlyprint  in
     let deprecation = nobj.notobj_deprecation in
-    let specific = match scope with None -> LastLonelyNotation | Some sc -> NotationInScope sc in
-    let specific_ntn = (specific,ntn) in
-    let fresh = not (Notation.exists_notation_in_scope scope ntn onlyprint pat) in
-    if fresh then begin
-      (* Declare the interpretation *)
-      let () = Notation.declare_notation_interpretation ntn scope pat df ~onlyprint deprecation in
-      (* Declare the uninterpretation *)
-      if not nobj.notobj_onlyparse then
-        Notation.declare_uninterpretation (NotationRule specific_ntn) pat;
-      (* Declare a possible coercion *)
-      (match nobj.notobj_coercion with
-      | Some (IsEntryCoercion entry) ->
-        let (_,level,_) = Notation.level_of_notation ntn in
-        let level = match fst ntn with
-          | InConstrEntry -> None
-          | InCustomEntry _ -> Some level
-        in
-        Notation.declare_entry_coercion specific_ntn level entry
-      | Some (IsEntryGlobal (entry,n)) -> Notation.declare_custom_entry_has_global entry n
-      | Some (IsEntryIdent (entry,n)) -> Notation.declare_custom_entry_has_ident entry n
-      | None -> ())
-      end;
+    let scope = match scope with None -> LastLonelyNotation | Some sc -> NotationInScope sc in
+    let also_in_cases_pattern = nobj.notobj_also_in_cases_pattern in
+    (* Declare the notation *)
+    (match nobj.notobj_use with
+    | Some use -> Notation.declare_notation (scope,ntn) pat df ~use ~also_in_cases_pattern nobj.notobj_coercion deprecation
+    | None -> ());
     (* Declare specific format if any *)
-    match nobj.notobj_specific_pp_rules with
+    (match nobj.notobj_specific_pp_rules with
     | Some pp_sy ->
-      if specific_format_to_declare specific_ntn pp_sy then
+      if specific_format_to_declare (scope,ntn) pp_sy then
         Ppextend.declare_specific_notation_printing_rules
-          specific_ntn ~extra:pp_sy.synext_extra pp_sy.synext_unparsing
-    | None -> ()
+          (scope,ntn) ~extra:pp_sy.synext_extra pp_sy.synext_unparsing
+    | None -> ())
   end
 
 let cache_notation o =
@@ -1596,6 +1536,20 @@ let make_printing_rules reserved (sd : SynData.syn_data) = let open SynData in
     synext_extra  = sd.extra;
   }
 
+let warn_unused_interpretation =
+  CWarnings.create ~name:"unused-notation" ~category:"parsing"
+         (fun b ->
+          strbrk "interpretation is used neither for printing nor for parsing, " ++
+          (if b then strbrk "the declaration could be replaced by \"Reserved Notation\"."
+          else strbrk "the declaration could be removed."))
+
+let make_use reserved onlyparse onlyprint =
+  match onlyparse, onlyprint with
+  | false, false -> Some ParsingAndPrinting
+  | true, false -> Some OnlyParsing
+  | false, true -> Some OnlyPrinting
+  | true, true -> warn_unused_interpretation reserved; None
+
 (**********************************************************************)
 (* Main functions about notations                                     *)
 
@@ -1608,7 +1562,14 @@ let add_notation_in_scope ~local deprecation df env c mods scope =
   let sd = compute_syntax_data ~local deprecation df mods in
   (* Prepare the parsing and printing rules *)
   let sy_pa_rules = make_parsing_rules sd in
-  let sy_pp_rules = make_printing_rules false sd in
+  let sy_pp_rules, gen_sy_pp_rules =
+    match sd.only_parsing, Ppextend.has_generic_notation_printing_rule (fst sd.info) with
+    | true, true -> None, None
+    | onlyparse, has_generic ->
+      let rules = make_printing_rules false sd in
+      let _ = check_reserved_format (fst sd.info) rules in
+      (if onlyparse then None else rules),
+      (if has_generic then None else (* We use the format of this notation as the default *) rules) in
   (* Prepare the interpretation *)
   let i_vars = make_internalization_vars sd.recvars sd.mainvars sd.intern_typs in
   let nenv = {
@@ -1616,26 +1577,24 @@ let add_notation_in_scope ~local deprecation df env c mods scope =
     ninterp_rec_vars = to_map sd.recvars;
   } in
   let (acvars, ac, reversibility) = interp_notation_constr env nenv c in
-  let interp = make_interpretation_vars sd.recvars acvars (fst sd.pa_syntax_data) in
+  let interp = make_interpretation_vars sd.recvars (pi2 sd.level) acvars (fst sd.pa_syntax_data) in
   let map (x, _) = try Some (x, Id.Map.find x interp) with Not_found -> None in
+  let vars = List.map_filter map i_vars in (* Order of elements is important here! *)
+  let also_in_cases_pattern = has_no_binders_type vars in
   let onlyparse,coe = printability (Some sd.level) sd.subentries sd.only_parsing reversibility ac in
   let notation, location = sd.info in
+  let use = make_use true onlyparse sd.only_printing in
   let notation = {
     notobj_local = local;
     notobj_scope = scope;
-    notobj_interp = (List.map_filter map i_vars, ac);
-    (* Order is important here! *)
-    notobj_onlyparse = onlyparse;
+    notobj_use = use;
+    notobj_interp = (vars, ac);
     notobj_coercion = coe;
-    notobj_onlyprint = sd.only_printing;
     notobj_deprecation = sd.deprecation;
     notobj_notation = (notation, location);
     notobj_specific_pp_rules = sy_pp_rules;
+    notobj_also_in_cases_pattern = also_in_cases_pattern;
   } in
-  let gen_sy_pp_rules =
-    if Ppextend.has_generic_notation_printing_rule (fst sd.info) then None
-    else sy_pp_rules (* We use the format of this notation as the default *) in
-  let _ = check_reserved_format (fst sd.info) sy_pp_rules in
   (* Ready to change the global state *)
   List.iter (fun f -> f ()) sd.msgs;
   Lib.add_anonymous_leaf (inSyntaxExtension (local, (sy_pa_rules,gen_sy_pp_rules)));
@@ -1663,20 +1622,23 @@ let add_notation_interpretation_core ~local df env ?(impls=empty_internalization
     ninterp_rec_vars = to_map recvars;
   } in
   let (acvars, ac, reversibility) = interp_notation_constr env ~impls nenv c in
-  let interp = make_interpretation_vars recvars acvars (List.combine mainvars i_typs) in
+  let plevel = match level with Some (from,level,l) -> level | None (* numeral: irrelevant )*) -> 0 in
+  let interp = make_interpretation_vars recvars plevel acvars (List.combine mainvars i_typs) in
   let map (x, _) = try Some (x, Id.Map.find x interp) with Not_found -> None in
+  let vars = List.map_filter map i_vars in (* Order of elements is important here! *)
+  let also_in_cases_pattern = has_no_binders_type vars in
   let onlyparse,coe = printability level i_typs onlyparse reversibility ac in
+  let use = make_use false onlyparse onlyprint in
   let notation = {
     notobj_local = local;
     notobj_scope = scope;
-    notobj_interp = (List.map_filter map i_vars, ac);
-    (* Order is important here! *)
-    notobj_onlyparse = onlyparse;
+    notobj_use = use;
+    notobj_interp = (vars, ac);
     notobj_coercion = coe;
-    notobj_onlyprint = onlyprint;
     notobj_deprecation = deprecation;
     notobj_notation = df';
     notobj_specific_pp_rules = pp_sy;
+    notobj_also_in_cases_pattern = also_in_cases_pattern;
   } in
   Lib.add_anonymous_leaf (inNotation notation);
   df'
@@ -1847,11 +1809,12 @@ let add_syntactic_definition ~local deprecation env ident (vars,c) { onlyparsing
       } in
       interp_notation_constr env nenv c
   in
-  let in_pat id = (id,ETConstr (Constrexpr.InConstrEntry,None,(NextLevel,0))) in
-  let interp = make_interpretation_vars ~default_if_binding:AsIdentOrPattern [] acvars (List.map in_pat vars) in
+  let in_pat id = (id,ETConstr (Constrexpr.InConstrEntry,None,(NextLevel,InternalProd))) in
+  let interp = make_interpretation_vars ~default_if_binding:AsIdentOrPattern [] 0 acvars (List.map in_pat vars) in
   let vars = List.map (fun x -> (x, Id.Map.find x interp)) vars in
+  let also_in_cases_pattern = has_no_binders_type vars in
   let onlyparsing = onlyparsing || fst (printability None [] false reversibility pat) in
-  Syntax_def.declare_syntactic_definition ~local deprecation ident ~onlyparsing (vars,pat)
+  Syntax_def.declare_syntactic_definition ~local ~also_in_cases_pattern deprecation ident ~onlyparsing (vars,pat)
 
 (**********************************************************************)
 (* Declaration of custom entry                                        *)

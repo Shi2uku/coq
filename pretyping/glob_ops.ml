@@ -91,7 +91,7 @@ let case_style_eq s1 s2 = let open Constr in match s1, s2 with
 let rec cases_pattern_eq p1 p2 = match DAst.get p1, DAst.get p2 with
   | PatVar na1, PatVar na2 -> Name.equal na1 na2
   | PatCstr (c1, pl1, na1), PatCstr (c2, pl2, na2) ->
-    eq_constructor c1 c2 && List.equal cases_pattern_eq pl1 pl2 &&
+    Construct.CanOrd.equal c1 c2 && List.equal cases_pattern_eq pl1 pl2 &&
       Name.equal na1 na2
   | (PatVar _ | PatCstr _), _ -> false
 
@@ -109,7 +109,7 @@ let matching_var_kind_eq k1 k2 = match k1, k2 with
 
 let tomatch_tuple_eq f (c1, p1) (c2, p2) =
   let eqp {CAst.v=(i1, na1)} {CAst.v=(i2, na2)} =
-    eq_ind i1 i2 && List.equal Name.equal na1 na2
+    Ind.CanOrd.equal i1 i2 && List.equal Name.equal na1 na2
   in
   let eq_pred (n1, o1) (n2, o2) = Name.equal n1 n2 && Option.equal eqp o1 o2 in
   f c1 c2 && eq_pred p1 p2
@@ -128,7 +128,7 @@ let fix_kind_eq k1 k2 = match k1, k2 with
   | (GFix _ | GCoFix _), _ -> false
 
 let instance_eq f (x1,c1) (x2,c2) =
-  Id.equal x1 x2 && f c1 c2
+  Id.equal x1.CAst.v x2.CAst.v && f c1 c2
 
 let mk_glob_constr_eq f c1 c2 = match DAst.get c1, DAst.get c2 with
   | GRef (gr1, u1), GRef (gr2, u2) ->
@@ -136,7 +136,7 @@ let mk_glob_constr_eq f c1 c2 = match DAst.get c1, DAst.get c2 with
     Option.equal (List.equal glob_level_eq) u1 u2
   | GVar id1, GVar id2 -> Id.equal id1 id2
   | GEvar (id1, arg1), GEvar (id2, arg2) ->
-    Id.equal id1 id2 && List.equal (instance_eq f) arg1 arg2
+    Id.equal id1.CAst.v id2.CAst.v && List.equal (instance_eq f) arg1 arg2
   | GPatVar k1, GPatVar k2 -> matching_var_kind_eq k1 k2
   | GApp (f1, arg1), GApp (f2, arg2) ->
     f f1 f2 && List.equal f arg1 arg2
@@ -523,6 +523,7 @@ let rec cases_pattern_of_glob_constr env na c =
     | Anonymous -> PatVar (Name id)
     end
   | GHole (_,_,_) -> PatVar na
+  | GRef (GlobRef.VarRef id,_) -> PatVar (Name id)
   | GRef (GlobRef.ConstructRef cstr,_) -> PatCstr (cstr,[],na)
   | GApp (c, l) ->
     begin match DAst.get c with

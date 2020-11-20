@@ -1,6 +1,6 @@
 .. _micromega:
 
-Micromega: tactics for solving arithmetic goals over ordered rings
+Micromega: solvers for arithmetic goals over ordered rings
 ==================================================================
 
 :Authors: Frédéric Besson and Evgeny Makarov
@@ -25,8 +25,8 @@ tactics for solving arithmetic goals over :math:`\mathbb{Q}`,
   ``n`` is an optional integer limiting the proof search depth,
   is an incomplete proof procedure for non-linear arithmetic.
   It is based on John Harrison’s HOL Light
-  driver to the external prover `csdp` [#csdp]_. Note that the `csdp` driver is
-  generating a *proof cache* which makes it possible to rerun scripts
+  driver to the external prover `csdp` [#csdp]_. Note that the `csdp` driver
+  generates a *proof cache* which makes it possible to rerun scripts
   even without `csdp`.
 
 .. flag:: Simplex
@@ -61,25 +61,32 @@ tactics for solving arithmetic goals over :math:`\mathbb{Q}`,
 
 The tactics solve propositional formulas parameterized by atomic
 arithmetic expressions interpreted over a domain :math:`D \in \{\mathbb{Z},\mathbb{Q},\mathbb{R}\}`.
-The syntax of the formulas is the following:
+The syntax for formulas over :math:`\mathbb{Z}` is:
 
- .. productionlist:: F
-   F : A ∣ P | True ∣ False ∣ F ∧ F ∣ F ∨ F ∣ F ↔ F ∣ F → F ∣ ¬ F | F = F
-   A : p = p ∣ p > p ∣ p < p ∣ p ≥ p ∣ p ≤ p
-   p : c ∣ x ∣ −p ∣ p − p ∣ p + p ∣ p × p ∣ p ^ n
+   .. note the following is not an insertprodn
 
-where :math:`F` is interpreted over either `Prop` or `bool`,
-:math:`c` is a numeric constant, :math:`x \in D` is a numeric variable, the
-operators :math:`−, +, ×` are respectively subtraction, addition, and product;
-:math:`p ^ n` is exponentiation by a constant :math:`n`, :math:`P` is an arbitrary proposition.
-For :math:`\mathbb{Q}`, equality is not Leibniz equality ``=`` but the equality of
-rationals ``==``.
+   .. prodn::
+      F ::= {| @A | P | True | False | @F /\\ @F | @F \\/ @F | @F <-> @F | @F -> @F | ~ @F | @F = @F }
+      A ::= {| @p = @p | @p > @p | @p < @p | @p >= @p | @p <= @p }
+      p ::= {| c | x | −@p | @p − @p | @p + @p | @p * @p | @p ^ n }
+
+where
+
+  - :token:`F` is interpreted over either `Prop` or `bool`
+  - :n:`P` is an arbitrary proposition
+  - :n:`c` is a numeric constant of :math:`D`
+  - :n:`x` :math:`\in D` is a numeric variable
+  - :n:`−`, :n:`+` and :n:`*` are respectively subtraction, addition and product
+  - :n:`p ^ n` is exponentiation by a constant :math:`n`
 
 When :math:`F` is interpreted over `bool`, the boolean operators are
 `&&`, `||`, `Bool.eqb`, `Bool.implb`, `Bool.negb` and the comparisons
 in :math:`A` are also interpreted over the booleans (e.g., for
 :math:`\mathbb{Z}`, we have `Z.eqb`, `Z.gtb`, `Z.ltb`, `Z.geb`,
 `Z.leb`).
+
+For :math:`\mathbb{Q}`, use the equality of rationals ``==`` rather than
+Leibniz equality ``=``.
 
 For :math:`\mathbb{Z}` (resp. :math:`\mathbb{Q}`), :math:`c` ranges over integer constants (resp. rational
 constants). For :math:`\mathbb{R}`, the tactic recognizes as real constants the
@@ -243,7 +250,7 @@ proof by abstracting monomials by variables.
 `psatz`: a proof procedure for non-linear arithmetic
 ----------------------------------------------------
 
-.. tacn:: psatz
+.. tacn:: psatz @one_term {? @int_or_var }
    :name: psatz
 
    This tactic explores the *Cone* by increasing degrees – hence the
@@ -276,60 +283,103 @@ obtain :math:`-1`. By Theorem :ref:`Psatz <psatz_thm>`, the goal is valid.
 .. tacn:: zify
    :name: zify
 
-   This tactic is internally called by :tacn:`lia` to support additional types e.g., :g:`nat`, :g:`positive` and :g:`N`.
-   By requiring the module ``ZifyBool``, the boolean type :g:`bool` and some comparison operators are also supported.
+   This tactic is internally called by :tacn:`lia` to support additional types, e.g., :g:`nat`, :g:`positive` and :g:`N`.
+   Additional support is provided by the following modules:
+
+   + For boolean operators (e.g., :g:`Nat.leb`), require the module :g:`ZifyBool`.
+   + For comparison operators (e.g., :g:`Z.compare`), require the module :g:`ZifyComparison`.
+   + For native 63 bit integers, require the module :g:`ZifyInt63`.
+
    :tacn:`zify` can also be extended by rebinding the tactics `Zify.zify_pre_hook` and `Zify.zify_post_hook` that are
    respectively run in the first and the last steps of :tacn:`zify`.
 
    + To support :g:`Z.div` and :g:`Z.modulo`: ``Ltac Zify.zify_post_hook ::= Z.div_mod_to_equations``.
    + To support :g:`Z.quot` and :g:`Z.rem`: ``Ltac Zify.zify_post_hook ::= Z.quot_rem_to_equations``.
-   + To support :g:`Z.div`, :g:`Z.modulo`, :g:`Z.quot`, and :g:`Z.rem`: ``Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations``.
+   + To support :g:`Z.div`, :g:`Z.modulo`, :g:`Z.quot` and :g:`Z.rem`: either ``Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations`` or ``Ltac Zify.zify_convert_to_euclidean_division_equations_flag ::= constr:(true)``.
 
    The :tacn:`zify` tactic can be extended with new types and operators by declaring and registering new typeclass instances using the following commands.
    The typeclass declarations can be found in the module ``ZifyClasses`` and the default instances can be found in the module ``ZifyInst``.
 
-.. cmd:: Add Zify {| InjTyp | BinOp | UnOp |CstOp | BinRel | UnOpSpec | BinOpSpec } @qualid
+.. cmd:: Add Zify @add_zify @one_term
 
-   This command registers an instance of one of the typeclasses among ``InjTyp``, ``BinOp``, ``UnOp``, ``CstOp``,  ``BinRel``,
-   ``UnOpSpec``, ``BinOpSpec``.
+   .. insertprodn add_zify add_zify
 
-.. cmd:: Show Zify {| InjTyp | BinOp | UnOp |CstOp | BinRel | UnOpSpec | BinOpSpec }
+   .. prodn::
+      add_zify ::= {| InjTyp | BinOp | UnOp | CstOp | BinRel | UnOpSpec | BinOpSpec }
+      | {| PropOp | PropBinOp | PropUOp | Saturate }
 
-   The command prints the typeclass instances of one the typeclasses
-   among ``InjTyp``, ``BinOp``, ``UnOp``, ``CstOp``, ``BinRel``,
-   ``UnOpSpec``, ``BinOpSpec``. For instance, :cmd:`Show Zify` ``InjTyp``
+   Registers an instance of the specified typeclass.
+
+.. cmd:: Show Zify @show_zify
+
+   .. insertprodn show_zify show_zify
+
+   .. prodn::
+      show_zify ::= {| InjTyp | BinOp | UnOp | CstOp | BinRel | UnOpSpec | BinOpSpec | Spec }
+
+   Prints instances for the specified typeclass.  For instance, :cmd:`Show Zify` ``InjTyp``
    prints the list of types that supported by :tacn:`zify` i.e.,
    :g:`Z`, :g:`nat`, :g:`positive` and :g:`N`.
 
 .. cmd:: Show Zify Spec
 
    .. deprecated:: 8.13
-       Use instead either :cmd:`Show Zify` ``UnOpSpec`` or :cmd:`Show Zify` ``BinOpSpec``.
+       Use :cmd:`Show Zify` ``UnOpSpec`` or :cmd:`Show Zify` ``BinOpSpec`` instead.
 
-.. cmd:: Add InjTyp
-
-   .. deprecated:: 8.13
-       Use instead either :cmd:`Add Zify` ``InjTyp``.
-
-.. cmd:: Add BinOp
+.. cmd:: Add InjTyp @one_term
 
    .. deprecated:: 8.13
-       Use instead either :cmd:`Add Zify` ``BinOp``.
+       Use :cmd:`Add Zify` ``InjTyp`` instead.
 
-.. cmd:: Add UnOp
-
-   .. deprecated:: 8.13
-       Use instead either :cmd:`Add Zify` ``UnOp``.
-
-.. cmd:: Add CstOp
+.. cmd:: Add BinOp @one_term
 
    .. deprecated:: 8.13
-       Use instead either :cmd:`Add Zify` ``CstOp``.
+       Use :cmd:`Add Zify` ``BinOp`` instead.
 
-.. cmd:: Add BinRel
+.. cmd:: Add BinOpSpec @one_term
 
    .. deprecated:: 8.13
-       Use instead either :cmd:`Add Zify` ``BinRel``.
+       Use :cmd:`Add Zify` ``BinOpSpec`` instead.
+
+.. cmd:: Add UnOp @one_term
+
+   .. deprecated:: 8.13
+       Use :cmd:`Add Zify` ``UnOp`` instead.
+
+.. cmd:: Add UnOpSpec @one_term
+
+   .. deprecated:: 8.13
+       Use :cmd:`Add Zify` ``UnOpSpec`` instead.
+
+.. cmd:: Add CstOp @one_term
+
+   .. deprecated:: 8.13
+       Use :cmd:`Add Zify` ``CstOp`` instead.
+
+.. cmd:: Add BinRel @one_term
+
+   .. deprecated:: 8.13
+       Use :cmd:`Add Zify` ``BinRel`` instead.
+
+.. cmd:: Add PropOp @one_term
+
+   .. deprecated:: 8.13
+       Use :cmd:`Add Zify` ``PropOp`` instead.
+
+.. cmd:: Add PropBinOp @one_term
+
+   .. deprecated:: 8.13
+       Use :cmd:`Add Zify` ``PropBinOp`` instead.
+
+.. cmd:: Add PropUOp @one_term
+
+   .. deprecated:: 8.13
+       Use :cmd:`Add Zify` ``PropUOp`` instead.
+
+.. cmd:: Add Saturate @one_term
+
+   .. deprecated:: 8.13
+       Use :cmd:`Add Zify` ``Saturate`` instead.
 
 
 

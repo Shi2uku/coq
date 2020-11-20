@@ -80,17 +80,17 @@ and conv_atom env pb lvl a1 a2 cu =
     | Arel i1, Arel i2 ->
         if Int.equal i1 i2 then cu else raise NotConvertible
     | Aind (ind1,u1), Aind (ind2,u2) ->
-       if eq_ind ind1 ind2 then convert_instances ~flex:false u1 u2 cu
+       if Ind.CanOrd.equal ind1 ind2 then convert_instances ~flex:false u1 u2 cu
        else raise NotConvertible
     | Aconstant (c1,u1), Aconstant (c2,u2) ->
-       if Constant.equal c1 c2 then convert_instances ~flex:true u1 u2 cu
+       if Constant.CanOrd.equal c1 c2 then convert_instances ~flex:true u1 u2 cu
        else raise NotConvertible
     | Asort s1, Asort s2 ->
         sort_cmp_universes env pb s1 s2 cu
     | Avar id1, Avar id2 ->
         if Id.equal id1 id2 then cu else raise NotConvertible
     | Acase(a1,ac1,p1,bs1), Acase(a2,ac2,p2,bs2) ->
-        if not (eq_ind a1.asw_ind a2.asw_ind) then raise NotConvertible;
+        if not (Ind.CanOrd.equal a1.asw_ind a2.asw_ind) then raise NotConvertible;
         let cu = conv_accu env CONV lvl ac1 ac2 cu in
         let tbl = a1.asw_reloc in
         let len = Array.length tbl in
@@ -124,7 +124,7 @@ and conv_atom env pb lvl a1 a2 cu =
        let v = mk_rel_accu lvl in
        conv_val env pb (lvl + 1) (d1 v) (d2 v) cu
     | Aproj((ind1, i1), ac1), Aproj((ind2, i2), ac2) ->
-       if not (eq_ind ind1 ind2 && Int.equal i1 i2) then raise NotConvertible
+       if not (Ind.CanOrd.equal ind1 ind2 && Int.equal i1 i2) then raise NotConvertible
        else conv_accu env CONV lvl ac1 ac2 cu
     | Arel _, _ | Aind _, _ | Aconstant _, _ | Asort _, _ | Avar _, _
     | Acase _, _ | Afix _, _ | Acofix _, _ | Acofixe _, _ | Aprod _, _
@@ -161,7 +161,7 @@ let native_conv_gen pb sigma env univs t1 t2 =
   let fn = compile ml_filename code ~profile:false in
   if !Flags.debug then Feedback.msg_debug (Pp.str "Running test...");
   let t0 = Sys.time () in
-  call_linker env ~fatal:true ~prefix fn (Some upds);
+  call_linker ~fatal:true ~prefix fn (Some upds);
   let t1 = Sys.time () in
   let time_info = Format.sprintf "Evaluation done in %.5f@." (t1 -. t0) in
   if !Flags.debug then Feedback.msg_debug (Pp.str time_info);
@@ -176,7 +176,7 @@ let native_conv cv_pb sigma env t1 t2 =
     else Constr.eq_constr_univs univs t1 t2
   in
   if not b then
-    let univs = (univs, checked_universes) in
+    let state = (univs, checked_universes) in
     let t1 = Term.it_mkLambda_or_LetIn t1 (Environ.rel_context env) in
     let t2 = Term.it_mkLambda_or_LetIn t2 (Environ.rel_context env) in
-    let _ = native_conv_gen cv_pb sigma env univs t1 t2 in ()
+    let _ = native_conv_gen cv_pb sigma env state t1 t2 in ()

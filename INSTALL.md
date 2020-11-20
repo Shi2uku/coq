@@ -1,18 +1,21 @@
 Installing From Sources
 =======================
 
+This document presents instructions to install this branch of Coq.
+For more general installation instructions and information about known
+build system issues, please consult the wiki page: 
+
+  https://github.com/coq/coq/wiki#coq-installation
+
 Build Requirements
 ------------------
 
 To compile Coq yourself, you need:
 
 - [OCaml](https://ocaml.org/) (version >= 4.05.0)
-  (This version of Coq has been tested up to OCaml 4.10.0)
+  (This version of Coq has been tested up to OCaml 4.11.1)
 
-- The [num](https://github.com/ocaml/num) library; note that it is
-  included in the OCaml distribution for OCaml versions < 4.06.0
-
-- The [ZArith library](https://github.com/ocaml/Zarith) >= 1.8
+- The [ZArith library](https://github.com/ocaml/Zarith) >= 1.10
 
 - The [findlib](http://projects.camlcity.org/projects/findlib.html) library (version >= 1.8.0)
 
@@ -26,18 +29,18 @@ To compile Coq yourself, you need:
 
 - for CoqIDE, the
   [lablgtk3-sourceview3](https://github.com/garrigue/lablgtk) library
-  (version >= 3.0.beta8), and the corresponding GTK 3.x libraries, as
+  (version >= 3.1.0), and the corresponding GTK 3.x libraries, as
   of today (gtk+3 >= 3.18 and gtksourceview3 >= 3.18)
 
-The IEEE-754 compliance is required by primitive floating-point
-numbers (`Require Import Floats`). Common sources of incompatibility
-are checked at configure time, preventing compilation. In the,
-unlikely, event an incompatibility remains undetected, using Floats
-would enable to prove False on this architecture.
+Primitive floating-point numbers require IEEE-754 compliance
+(`Require Import Floats`). Common sources of incompatibility
+are checked at configure time, preventing compilation. In the
+unlikely event an incompatibility remains undetected, using `Floats`
+would enable proving `False` on this architecture.
 
-Note that `num` and `lablgtk3-sourceview3` should be properly
-registered with `findlib/ocamlfind` as Coq's makefile will use it to
-locate the libraries during the build.
+Note that OCaml dependencies (`zarith` and `lablgtk3-sourceview3` at
+this moment) must be properly registered with `findlib/ocamlfind`
+since Coq's build system uses `findlib` to locate them.
 
 Debian / Ubuntu users can get the necessary system packages for
 CoqIDE with:
@@ -47,9 +50,9 @@ CoqIDE with:
 Opam (https://opam.ocaml.org/) is recommended to install OCaml and
 the corresponding packages.
 
-    $ opam switch create coq 4.10.0+flambda
+    $ opam switch create coq 4.11.1+flambda
     $ eval $(opam env)
-    $ opam install num ocamlfind lablgtk3-sourceview3
+    $ opam install ocamlfind zarith lablgtk3-sourceview3
 
 should get you a reasonable OCaml environment to compile Coq. See the
 OPAM documentation for more help.

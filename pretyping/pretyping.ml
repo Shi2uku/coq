@@ -139,7 +139,7 @@ let interp_known_universe_level_name evd qid =
     let qid = Nametab.locate_universe qid in
     Univ.Level.make qid
 
-let interp_universe_level_name ~anon_rigidity evd qid =
+let interp_universe_level_name evd qid =
   try evd, interp_known_universe_level_name evd qid
   with Not_found ->
     if Libnames.qualid_is_ident qid then (* Undeclared *)
@@ -162,21 +162,15 @@ let interp_universe_level_name ~anon_rigidity evd qid =
         with UGraph.AlreadyDeclared -> evd
       in evd, level
 
-let interp_universe_name ?loc evd l =
-  (* [univ_flexible_alg] can produce algebraic universes in terms *)
-  let anon_rigidity = univ_flexible in
-  let evd', l = interp_universe_level_name ~anon_rigidity evd l in
-  evd', l
-
-let interp_sort_name ?loc sigma = function
+let interp_sort_name sigma = function
   | GSProp -> sigma, Univ.Level.sprop
   | GProp -> sigma, Univ.Level.prop
   | GSet -> sigma, Univ.Level.set
-  | GType l -> interp_universe_name ?loc sigma l
+  | GType l -> interp_universe_level_name sigma l
 
 let interp_sort_info ?loc evd l =
     List.fold_left (fun (evd, u) (l,n) ->
-      let evd', u' = interp_sort_name ?loc evd l in
+      let evd', u' = interp_sort_name evd l in
       let u' = Univ.Universe.make u' in
       let u' = match n with
       | 0 -> u'
@@ -365,9 +359,9 @@ let inh_conv_coerce_to_tycon ?loc ~program_mode resolve_tc env sigma j = functio
   | Some t ->
     Coercion.inh_conv_coerce_to ?loc ~program_mode resolve_tc !!env sigma j t
 
-let check_instance loc subst = function
+let check_instance subst = function
   | [] -> ()
-  | (id,_) :: _ ->
+  | (CAst.{loc;v=id},_) :: _ ->
       if List.mem_assoc id subst then
         user_err ?loc  (Id.print id ++ str "appears more than once.")
       else
@@ -410,7 +404,7 @@ let interp_known_glob_level ?loc evd = function
 
 let interp_glob_level ?loc evd : glob_level -> _ = function
   | UAnonymous {rigid} -> new_univ_level_variable ?loc (if rigid then univ_rigid else univ_flexible) evd
-  | UNamed s -> interp_sort_name ?loc evd s
+  | UNamed s -> interp_sort_name evd s
 
 let interp_instance ?loc evd l =
   let evd, l' =
@@ -493,7 +487,7 @@ type 'a pretype_fun = ?loc:Loc.t -> program_mode:bool -> poly:bool -> bool -> ty
 type pretyper = {
   pretype_ref : pretyper -> GlobRef.t * glob_level list option -> unsafe_judgment pretype_fun;
   pretype_var : pretyper -> Id.t -> unsafe_judgment pretype_fun;
-  pretype_evar : pretyper -> existential_name * (Id.t * glob_constr) list -> unsafe_judgment pretype_fun;
+  pretype_evar : pretyper -> existential_name CAst.t * (lident * glob_constr) list -> unsafe_judgment pretype_fun;
   pretype_patvar : pretyper -> Evar_kinds.matching_var_kind -> unsafe_judgment pretype_fun;
   pretype_app : pretyper -> glob_constr * glob_constr list -> unsafe_judgment pretype_fun;
   pretype_lambda : pretyper -> Name.t * binding_kind * glob_constr * glob_constr -> unsafe_judgment pretype_fun;
@@ -587,10 +581,10 @@ let pretype_instance self ~program_mode ~poly resolve_tc env sigma loc hyps evk 
           strbrk " is not well-typed.") in
     let sigma, c, update =
       try
-        let c = List.assoc id update in
+        let c = snd (List.find (fun (CAst.{v=id'},c) -> Id.equal id id') update) in
         let sigma, c = eval_pretyper self ~program_mode ~poly resolve_tc (mk_tycon t) env sigma c in
         check_body sigma id (Some c.uj_val);
-        sigma, c.uj_val, List.remove_assoc id update
+        sigma, c.uj_val, List.remove_first (fun (CAst.{v=id'},_) -> Id.equal id id') update
       with Not_found ->
       try
         let (n,b',t') = lookup_rel_id id (rel_context !!env) in
@@ -609,7 +603,7 @@ let pretype_instance self ~program_mode ~poly resolve_tc env sigma loc hyps evk 
           str " in current context: no binding for " ++ Id.print id ++ str ".") in
     ((id,c)::subst, update, sigma) in
   let subst,inst,sigma = List.fold_right f hyps ([],update,sigma) in
-  check_instance loc subst inst;
+  check_instance subst inst;
   sigma, List.map snd subst
 
 module Default =
@@ -628,13 +622,13 @@ struct
     let sigma, t_id = pretype_id (fun e r t -> pretype tycon e r t) loc env sigma id in
     discard_trace @@ inh_conv_coerce_to_tycon ?loc ~program_mode resolve_tc env sigma t_id tycon
 
-  let pretype_evar self (id, inst) ?loc ~program_mode ~poly resolve_tc tycon env sigma =
+  let pretype_evar self (CAst.{v=id;loc=locid}, inst) ?loc ~program_mode ~poly resolve_tc tycon env sigma =
       (* Ne faudrait-il pas s'assurer que hyps est bien un
          sous-contexte du contexte courant, et qu'il n'y a pas de Rel "caché" *)
       let id = interp_ltac_id env id in
       let evk =
         try Evd.evar_key id sigma
-        with Not_found -> error_evar_not_found ?loc !!env sigma id in
+        with Not_found -> error_evar_not_found ?loc:locid !!env sigma id in
       let hyps = evar_filtered_context (Evd.find sigma evk) in
       let sigma, args = pretype_instance self ~program_mode ~poly resolve_tc env sigma loc hyps evk inst in
       let c = mkEvar (evk, args) in
@@ -813,7 +807,7 @@ struct
             try
               let IndType (indf, args) = find_rectype !!env sigma ty in
               let ((ind',u'),pars) = dest_ind_family indf in
-              if eq_ind ind ind' then List.map EConstr.of_constr pars
+              if Ind.CanOrd.equal ind ind' then List.map EConstr.of_constr pars
               else (* Let the usual code throw an error *) []
             with Not_found -> []
       else []
@@ -857,7 +851,7 @@ struct
               typing the argument, so we replace it by an existential
               variable *)
               let sigma, c_hole = new_evar env sigma ~src:(loc,Evar_kinds.InternalHole) c1 in
-              (sigma, make_judge c_hole c1), (c_hole, c, trace) :: bidiargs
+              (sigma, make_judge c_hole c1), (c_hole, c1, c, trace) :: bidiargs
             else
               let tycon = Some c1 in
               pretype tycon env sigma c, bidiargs
@@ -886,12 +880,10 @@ struct
     let sigma, resj, resj_before_bidi, bidiargs = apply_rec env sigma 0 fj fj candargs [] args in
     let sigma, resj = refresh_template env sigma resj in
     let sigma, resj, otrace = inh_conv_coerce_to_tycon ?loc ~program_mode resolve_tc env sigma resj tycon in
-    let refine_arg n (sigma,t) (newarg,origarg,trace) =
+    let refine_arg n (sigma,t) (newarg,ty,origarg,trace) =
       (* Refine an argument (originally `origarg`) represented by an evar
          (`newarg`) to use typing information from the context *)
-      (* Recover the expected type of the argument *)
-      let ty = Retyping.get_type_of !!env sigma newarg in
-      (* Type the argument using this expected type *)
+      (* Type the argument using the expected type *)
       let sigma, j = pretype (Some ty) env sigma origarg in
       (* Unify the (possibly refined) existential variable with the
       (typechecked) original value *)
@@ -925,7 +917,32 @@ struct
         let sigma, ty' = Coercion.inh_coerce_to_prod ?loc ~program_mode !!env sigma ty in
         sigma, Some ty'
     in
-    let sigma, (name',dom,rng) = split_tycon ?loc !!env sigma tycon' in
+    let sigma,name',dom,rng =
+      match tycon' with
+      | None -> sigma,Anonymous, None, None
+      | Some ty ->
+        let sigma, ty = Evardefine.presplit !!env sigma ty in
+        match EConstr.kind sigma ty with
+        | Prod (na,dom,rng) ->
+          sigma, na.binder_name, Some dom, Some rng
+        | Evar ev ->
+          (* define_evar_as_product works badly when impredicativity
+             is possible but not known (#12623). OTOH if we know we
+             are impredicative (typically Prop) we want to keep the
+             information when typing the body. *)
+          let s = Retyping.get_sort_of !!env sigma ty in
+          if Environ.is_impredicative_sort !!env s
+             || Evd.check_leq sigma (Univ.Universe.type1) (Sorts.univ_of_sort s)
+          then
+            let sigma, prod = define_evar_as_product !!env sigma ev in
+            let na,dom,rng = destProd sigma prod in
+            sigma, na.binder_name, Some dom, Some rng
+          else
+            sigma, Anonymous, None, None
+        | _ ->
+          (* XXX no error to allow later coercion? Not sure if possible with funclass *)
+          error_not_product ?loc !!env sigma ty
+    in
     let dom_valcon = valcon_of_tycon dom in
     let sigma, j = eval_type_pretyper self ~program_mode ~poly resolve_tc dom_valcon env sigma c1 in
     let name = {binder_name=name; binder_relevance=Sorts.relevance_of_sort j.utj_type} in
@@ -934,7 +951,7 @@ struct
     let var',env' = push_rel ~hypnaming sigma var env in
     let sigma, j' = eval_pretyper self ~program_mode ~poly resolve_tc rng env' sigma c2 in
     let name = get_name var' in
-    let resj = judge_of_abstraction !!env (orelse_name name name'.binder_name) j j' in
+    let resj = judge_of_abstraction !!env (orelse_name name name') j j' in
     discard_trace @@ inh_conv_coerce_to_tycon ?loc ~program_mode resolve_tc env sigma resj tycon
 
   let pretype_prod self (name, bk, c1, c2) =

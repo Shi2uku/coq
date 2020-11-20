@@ -2,7 +2,6 @@
 
 `doc_grammar` extracts Coq's grammar from `.mlg` files, edits it and inserts it
 into `.rst` files.  The tool inserts `prodn` directives for  grammar productions.
-(`productionlist` are gradually being replaced by `prodn` in the manual.)
 It also updates `tacn` and `cmd` directives when they can be unambiguously matched to
 productions of the grammar (in practice, that's probably almost always).
 `tacv` and `cmdv` directives are not updated because matching them appears to require
@@ -43,7 +42,7 @@ for documentation purposes:
     First, nonterminals that use levels (`"5" RIGHTA` below) are modified, for example:
 
     ```
-    tactic_expr:
+    ltac_expr:
       [ "5" RIGHTA
         [ te = binder_tactic -> { te } ]
       [ "4"   ...
@@ -179,6 +178,8 @@ non-terminals to rename.
 grammar with its productions and removing the non-terminal. Each should appear
 as a separate production.  (Doesn't work recursively; splicing for both
 `A: [ | B ]` and `B: [ | C ]` must be done in separate SPLICE operations.)
+
+`OPTINREF` - applies the local `OPTINREF` edit to every nonterminal
 
 `EXPAND` - expands LIST0, LIST1, LIST* ... SEP and OPT constructs into
 new non-terminals

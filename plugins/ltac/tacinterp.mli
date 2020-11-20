@@ -77,6 +77,9 @@ val val_interp : interp_sign -> glob_tactic_expr -> (value -> unit Proofview.tac
 val interp_ltac_constr : interp_sign -> glob_tactic_expr -> (constr -> unit Proofview.tactic) -> unit Proofview.tactic
 
 (** Interprets redexp arguments *)
+val interp_red_expr : interp_sign -> Environ.env -> Evd.evar_map -> glob_red_expr -> Evd.evar_map * red_expr
+
+(** Interprets redexp arguments from a raw one *)
 val interp_redexp : Environ.env -> Evd.evar_map -> raw_red_expr -> Evd.evar_map * red_expr
 
 (** Interprets tactic expressions *)
@@ -126,8 +129,12 @@ val interp_tac_gen : value Id.Map.t -> Id.Set.t ->
 val interp : raw_tactic_expr -> unit Proofview.tactic
 
 (** Hides interpretation for pretty-print *)
+type ltac_expr = {
+  global: bool;
+  ast:  Tacexpr.raw_tactic_expr;
+}
 
-val hide_interp : bool -> raw_tactic_expr -> unit Proofview.tactic option -> unit Proofview.tactic
+val hide_interp : ltac_expr -> ComTactic.interpretable
 
 (** Internals that can be useful for syntax extensions. *)
 

@@ -68,8 +68,16 @@ let pr_univ_name_list = function
   | Some l ->
     str "@{" ++ prlist_with_sep spc pr_lname l ++ str"}"
 
+let pr_variance_lident (lid,v) =
+  let v = Option.cata Univ.Variance.pr (mt()) v in
+  v ++ pr_lident lid
+
 let pr_univdecl_instance l extensible =
   prlist_with_sep spc pr_lident l ++
+  (if extensible then str"+" else mt ())
+
+let pr_cumul_univdecl_instance l extensible =
+  prlist_with_sep spc pr_variance_lident l ++
   (if extensible then str"+" else mt ())
 
 let pr_univdecl_constraints l extensible =
@@ -85,8 +93,19 @@ let pr_universe_decl l =
     str"@{" ++ pr_univdecl_instance l.univdecl_instance l.univdecl_extensible_instance ++
     pr_univdecl_constraints l.univdecl_constraints l.univdecl_extensible_constraints ++ str "}"
 
+let pr_cumul_univ_decl l =
+  let open UState in
+  match l with
+  | None -> mt ()
+  | Some l ->
+    str"@{" ++ pr_cumul_univdecl_instance l.univdecl_instance l.univdecl_extensible_instance ++
+    pr_univdecl_constraints l.univdecl_constraints l.univdecl_extensible_constraints ++ str "}"
+
 let pr_ident_decl (lid, l) =
   pr_lident lid ++ pr_universe_decl l
+
+let pr_cumul_ident_decl (lid, l) =
+  pr_lident lid ++ pr_cumul_univ_decl l
 
 let string_of_fqid fqid =
   String.concat "." (List.map Id.to_string fqid)
@@ -503,19 +522,20 @@ let pr_lconstrarg c =
 let pr_intarg n = spc () ++ int n
 
 let pr_oc = function
-  | None -> str" :"
-  | Some true -> str" :>"
-  | Some false -> str" :>>"
+  | NoInstance -> str" :"
+  | BackInstance -> str" :>"
 
 let pr_record_field (x, { rf_subclass = oc ; rf_priority = pri ; rf_notation = ntn }) =
   let prx = match x with
-    | AssumExpr (id,t) ->
+    | AssumExpr (id,binders,t) ->
       hov 1 (pr_lname id ++
+             pr_binders_arg binders ++ spc() ++
              pr_oc oc ++ spc() ++
              pr_lconstr_expr t)
-    | DefExpr(id,b,opt) -> (match opt with
+    | DefExpr(id,binders,b,opt) -> (match opt with
         | Some t ->
           hov 1 (pr_lname id ++
+                 pr_binders_arg binders ++ spc() ++
                  pr_oc oc ++ spc() ++
                  pr_lconstr_expr t ++ str" :=" ++ pr_lconstr b)
         | None ->
@@ -525,8 +545,7 @@ let pr_record_field (x, { rf_subclass = oc ; rf_priority = pri ; rf_notation = n
   prx ++ prpri ++ prlist (pr_decl_notation @@ pr_constr) ntn
 
 let pr_record_decl c fs =
-  pr_opt pr_lident c ++ (if c = None then str"{" else str" {") ++
-  hv 0 (prlist_with_sep pr_semicolon pr_record_field fs ++ str"}")
+  pr_opt pr_lident c ++ pr_record "{" "}" pr_record_field fs
 
 let pr_printable = function
   | PrintFullContext ->
@@ -848,7 +867,7 @@ let pr_vernac_expr v =
     let pr_oneind key (((coe,iddecl),(indupar,indpar),s,lc),ntn) =
       hov 0 (
         str key ++ spc() ++
-        (if coe then str"> " else str"") ++ pr_ident_decl iddecl ++
+        (if coe then str"> " else str"") ++ pr_cumul_ident_decl iddecl ++
         pr_and_type_binders_arg indupar ++
         pr_opt (fun p -> str "|" ++ spc() ++ pr_and_type_binders_arg p) indpar ++
         pr_opt (fun s -> str":" ++ spc() ++ pr_lconstr_expr s) s ++
@@ -967,7 +986,7 @@ let pr_vernac_expr v =
         str":" ++ spc () ++
         pr_constr cl ++ pr_hint_info pr_constr_pattern_expr info ++
         (match props with
-         | Some (true, { v = CRecord l}) -> spc () ++ str":=" ++ spc () ++ str"{" ++ pr_record_body l ++ str "}"
+         | Some (true, { v = CRecord l}) -> spc () ++ str":=" ++ spc () ++ pr_record_body "{" "}" pr_lconstr l
          | Some (true,_) -> assert false
          | Some (false,p) -> spc () ++ str":=" ++ spc () ++ pr_constr p
          | None -> mt()))
@@ -1312,20 +1331,10 @@ let pr_control_flag (p : control_flag) =
 
 let pr_vernac_control flags = Pp.prlist pr_control_flag flags
 
-let rec pr_vernac_flag (k, v) =
-  let k = keyword k in
-  let open Attributes in
-  match v with
-  | VernacFlagEmpty -> k
-  | VernacFlagLeaf v -> k ++ str " = " ++ qs v
-  | VernacFlagList m -> k ++ str "( " ++ pr_vernac_flags m ++ str " )"
-and pr_vernac_flags m =
-  prlist_with_sep (fun () -> str ", ") pr_vernac_flag m
-
 let pr_vernac_attributes =
   function
   | [] -> mt ()
-  | flags ->  str "#[" ++ pr_vernac_flags flags ++ str "]" ++ cut ()
+  | flags ->  str "#[" ++ prlist_with_sep pr_comma Attributes.pr_vernac_flag flags ++ str "]" ++ cut ()
 
 let pr_vernac ({v = {control; attrs; expr}} as v) =
   tag_vernac v

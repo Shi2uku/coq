@@ -512,6 +512,7 @@ let hints x = eval_call (Xmlprotocol.hints x)
 let search flags = eval_call (Xmlprotocol.search flags)
 let init x = eval_call (Xmlprotocol.init x)
 let stop_worker x = eval_call (Xmlprotocol.stop_worker x)
+let proof_diff x = eval_call (Xmlprotocol.proof_diff x)
 
 let break_coqtop coqtop workers =
   if coqtop.status = Busy then
@@ -549,6 +550,7 @@ struct
   let existential = BoolOpt ["Printing"; "Existential"; "Instances"]
   let universes = BoolOpt ["Printing"; "Universes"]
   let unfocused = BoolOpt ["Printing"; "Unfocused"]
+  let goal_names = BoolOpt ["Printing"; "Goal"; "Names"]
   let diff = StringOpt ["Diffs"]
 
   type 'a descr = { opts : 'a t list; init : 'a; label : string }
@@ -559,7 +561,7 @@ struct
     { opts = [raw_matching]; init = true;
       label = "Display raw _matching expressions" };
     { opts = [notations]; init = true; label = "Display _notations" };
-    { opts = [parentheses]; init = true; label = "Display _parentheses" };
+    { opts = [parentheses]; init = false; label = "Display _parentheses" };
     { opts = [all_basic]; init = false;
       label = "Display _all basic low-level contents" };
     { opts = [existential]; init = false;
@@ -567,7 +569,8 @@ struct
     { opts = [universes]; init = false; label = "Display _universe levels" };
     { opts = [all_basic;existential;universes]; init = false;
       label = "Display all _low-level contents" };
-    { opts = [unfocused]; init = false; label = "Display _unfocused goals" }
+    { opts = [unfocused]; init = false; label = "Display _unfocused goals" };
+    { opts = [goal_names]; init = false; label = "Display _goal names" }
   ]
 
   let diff_item = { opts = [diff]; init = "off"; label = "Display _proof diffs" }
@@ -578,6 +581,9 @@ struct
 
   let set (type a) (opt : a t) (v : a) =
     Hashtbl.replace current_state (opt_name opt) (opt_data opt v)
+
+  let get (type a) (opt : a t) =
+    Hashtbl.find current_state (opt_name opt)
 
   let reset () =
     let init_descr d = List.iter (fun o -> set o d.init) d.opts in

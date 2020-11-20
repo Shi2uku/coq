@@ -302,7 +302,7 @@ $(OCAMLC) $(MLINCLUDES) $(BYTEFLAGS) $(CUSTOM) -o $@ -linkpkg $(1) $^
 endef
 
 # Main packages linked by Coq.
-SYSMOD:=-package str,unix,dynlink,threads,num,zarith
+SYSMOD:=-package str,unix,dynlink,threads,zarith
 
 ###########################################################################
 # Infrastructure for the rest of the Makefile
@@ -398,6 +398,12 @@ $(COQPP): $(COQPPCMO) coqpp/coqpp_parser.mli coqpp/coqpp_parser.ml coqpp/coqpp_m
 # Specific rules for Uint63
 ###########################################################################
 kernel/uint63.ml: kernel/uint63_$(OCAML_INT_SIZE).ml
+	rm -f $@ && cp $< $@ && chmod a-w $@
+
+###########################################################################
+# Specific rules for Float64
+###########################################################################
+kernel/float64.ml: kernel/float64_$(OCAML_INT_SIZE).ml
 	rm -f $@ && cp $< $@ && chmod a-w $@
 
 ###########################################################################
@@ -587,11 +593,11 @@ CSDPCERTCMO:=clib/clib.cma $(addprefix plugins/micromega/, \
 
 $(CSDPCERT): $(call bestobj, $(CSDPCERTCMO))
 	$(SHOW)'OCAMLBEST -o $@'
-	$(HIDE)$(call bestocaml, -package num,unix)
+	$(HIDE)$(call bestocaml, -package unix)
 
 $(CSDPCERTBYTE): $(CSDPCERTCMO)
 	$(SHOW)'OCAMLC -o $@'
-	$(HIDE)$(call ocamlbyte, -package num,unix)
+	$(HIDE)$(call ocamlbyte, -package unix)
 
 ###########################################################################
 # tests
@@ -707,7 +713,7 @@ COND_OPTFLAGS= \
 
 plugins/micromega/%.cmi: plugins/micromega/%.mli
 	$(SHOW)'OCAMLC    $<'
-	$(HIDE)$(OCAMLC) $(COND_BYTEFLAGS) -package unix,num -c $<
+	$(HIDE)$(OCAMLC) $(COND_BYTEFLAGS) -package unix -c $<
 
 %.cmi: %.mli
 	$(SHOW)'OCAMLC    $<'
@@ -715,7 +721,7 @@ plugins/micromega/%.cmi: plugins/micromega/%.mli
 
 plugins/micromega/%.cmo: plugins/micromega/%.ml
 	$(SHOW)'OCAMLC    $<'
-	$(HIDE)$(OCAMLC) $(COND_BYTEFLAGS) -package unix,num -c $<
+	$(HIDE)$(OCAMLC) $(COND_BYTEFLAGS) -package unix -c $<
 
 %.cmo: %.ml
 	$(SHOW)'OCAMLC    $<'
@@ -752,7 +758,7 @@ plugins/micromega/csdpcert_FORPACK:=
 
 plugins/micromega/%.cmx: plugins/micromega/%.ml
 	$(SHOW)'OCAMLOPT  $<'
-	$(HIDE)$(OCAMLOPT) $(COND_OPTFLAGS) $(HACKMLI) $($(@:.cmx=_FORPACK)) -package unix,num -c $<
+	$(HIDE)$(OCAMLOPT) $(COND_OPTFLAGS) $(HACKMLI) $($(@:.cmx=_FORPACK)) -package unix -c $<
 
 plugins/%.cmx: plugins/%.ml
 	$(SHOW)'OCAMLOPT  $<'

@@ -20,8 +20,6 @@ open Tacarg
 open Names
 open Logic
 
-let wit_hyp = wit_var
-
 }
 
 DECLARE PLUGIN "ltac_plugin"
@@ -263,7 +261,7 @@ END
 
 (** Double induction *)
 
-TACTIC EXTEND double_induction
+TACTIC EXTEND double_induction DEPRECATED { Deprecation.make () }
 | [ "double" "induction" quantified_hypothesis(h1) quantified_hypothesis(h2) ] ->
   { Elim.h_double_induction h1 h2 }
 END

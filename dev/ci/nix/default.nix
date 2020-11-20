@@ -114,6 +114,7 @@ let projects = {
   mtac2 = callPackage ./mtac2.nix {};
   oddorder = callPackage ./oddorder.nix {};
   quickchick = callPackage ./quickchick.nix {};
+  simple-io = callPackage ./simple-io.nix {};
   verdi-raft = callPackage ./verdi-raft.nix {};
   VST = callPackage ./VST.nix {};
 }; in
@@ -130,7 +131,8 @@ stdenv.mkDerivation {
   name = "shell-for-${project}-in-${branch}";
 
   buildInputs =
-    optional withCoq coq
+    [ python ]
+  ++  optional withCoq coq
   ++ (prj.buildInputs or [])
   ++ optionals withCoq (prj.coqBuildInputs or [])
   ;

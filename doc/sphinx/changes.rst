@@ -14,7 +14,7 @@ Version 8.12
 Summary of changes
 ~~~~~~~~~~~~~~~~~~
 
-|Coq| version 8.12 integrates many usability improvements,
+Coq version 8.12 integrates many usability improvements,
 in particular with respect to notations, scopes and implicit arguments,
 along with many bug fixes and major improvements to the reference manual.
 The main changes include:
@@ -59,7 +59,7 @@ Erik Martin-Dorel has maintained the `Coq Docker images
 <https://hub.docker.com/r/coqorg/coq>`_ that are used in many Coq
 projects for continuous integration.
 
-The OPAM repository for |Coq| packages has been maintained by
+The OPAM repository for Coq packages has been maintained by
 Guillaume Claret, Karl Palmskog, Matthieu Sozeau and Enrico Tassi with
 contributions from many users. A list of packages is available at
 https://coq.inria.fr/opam/www/.
@@ -97,18 +97,18 @@ Laurent Théry, Ralf Treinen, Anton Trunov, Bernhard M. Wiedemann, Li-yao Xia,
 Nickolai Zeldovich and Théo Zimmermann.
 
 Many power users helped to improve the design of this new version via
-the GitHub issue and pull request system, the |Coq| development mailing list
+the GitHub issue and pull request system, the Coq development mailing list
 coqdev@inria.fr, the coq-club@inria.fr mailing list, the `Discourse forum
 <https://coq.discourse.group/>`_ and the new `Coq Zulip chat <http://coq.zulipchat.com>`_
 (thanks to Cyril Cohen for organizing the move from Gitter).
 
 Version 8.12's development spanned 6 months from the release of
-|Coq| 8.11.0. Emilio Jesus Gallego Arias and Théo Zimmermann are
+Coq 8.11.0. Emilio Jesus Gallego Arias and Théo Zimmermann are
 the release managers of Coq 8.12. This release is the result of
 ~500 PRs merged, closing ~100 issues.
 
 | Nantes, June 2020,
-| Matthieu Sozeau for the |Coq| development team
+| Matthieu Sozeau for the Coq development team
 |
 
 Changes in 8.12+beta1
@@ -147,7 +147,7 @@ Specification language, type inference
   This makes typeclasses with declared modes more robust with respect to the
   order of resolution.
   (`#10858 <https://github.com/coq/coq/pull/10858>`_,
-  fixes `#9058 <https://github.com/coq/coq/issues/9058>_`, by Matthieu Sozeau).
+  fixes `#9058 <https://github.com/coq/coq/issues/9058>`_, by Matthieu Sozeau).
 - **Added:**
   Warn when manual implicit arguments are used in unexpected positions
   of a term (e.g. in `Check id (forall {x}, x)`) or when an implicit
@@ -533,8 +533,8 @@ Flags, options and attributes
 - **Removed:**
   Unqualified ``polymorphic``, ``monomorphic``, ``template``,
   ``notemplate`` attributes (they were deprecated since Coq 8.10).
-  Use :attr:`universes(polymorphic)`, :attr:`universes(monomorphic)`,
-  :attr:`universes(template)` and :attr:`universes(notemplate)` instead
+  Use :attr:`universes(polymorphic)`, ``universes(monomorphic)``,
+  :attr:`universes(template)` and ``universes(notemplate)`` instead
   (`#11663 <https://github.com/coq/coq/pull/11663>`_, by Théo Zimmermann).
 - **Deprecated:**
   :flag:`Hide Obligations` flag
@@ -545,7 +545,7 @@ Flags, options and attributes
   <https://github.com/coq/coq/pull/11162>`_, by Enrico Tassi).
 - **Added:**
   New attributes supported when defining an inductive type
-  :attr:`universes(cumulative)`, :attr:`universes(noncumulative)` and
+  :attr:`universes(cumulative)`, ``universes(noncumulative)`` and
   :attr:`private(matching)`, which correspond to legacy attributes
   ``Cumulative``, ``NonCumulative``, and the previously undocumented
   ``Private`` (`#11665 <https://github.com/coq/coq/pull/11665>`_, by
@@ -800,7 +800,7 @@ Tools
   <https://github.com/coq/coq/pull/12387>`_, by Jason Gross).
 
 CoqIDE
-^^^^^^
+^^^^^^^^
 
 - **Removed:**
   "Tactic" menu from CoqIDE which had been unmaintained for a number of years
@@ -1141,9 +1141,6 @@ Infrastructure and dependencies
 Changes in 8.12.0
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. contents::
-   :local:
-
 **Notations**
 
 - **Added:**
@@ -1216,13 +1213,136 @@ Changes in 8.12.0
   modified in the meantime (`#12583 <https://github.com/coq/coq/pull/12583>`_,
   fixes `#12582 <https://github.com/coq/coq/issues/12582>`_, by Jason Gross).
 
+Changes in 8.12.1
+~~~~~~~~~~~~~~~~~~~~~
+
+**Kernel**
+
+- **Fixed:** Incompleteness of conversion checking on problems
+  involving :ref:`eta-expansion` and :ref:`cumulative universe
+  polymorphic inductive types <cumulative>` (`#12738
+  <https://github.com/coq/coq/pull/12738>`_, fixes `#7015
+  <https://github.com/coq/coq/issues/7015>`_, by Gaëtan Gilbert).
+
+- **Fixed:**
+  Polymorphic side-effects inside monomorphic definitions were incorrectly
+  handled as not inlined. This allowed deriving an inconsistency
+  (`#13331 <https://github.com/coq/coq/pull/13331>`_,
+  fixes `#13330 <https://github.com/coq/coq/issues/13330>`_,
+  by Pierre-Marie Pédrot).
+
+**Notations**
+
+- **Fixed:**
+  Undetected collision between a lonely notation and a notation in
+  scope at printing time
+  (`#12946 <https://github.com/coq/coq/pull/12946>`_,
+  fixes the first part of `#12908 <https://github.com/coq/coq/issues/12908>`_,
+  by Hugo Herbelin).
+- **Fixed:**
+  Printing of notations in custom entries with
+  variables not mentioning an explicit level
+  (`#13026 <https://github.com/coq/coq/pull/13026>`_,
+  fixes `#12775 <https://github.com/coq/coq/issues/12775>`_
+  and `#13018 <https://github.com/coq/coq/issues/13018>`_,
+  by Hugo Herbelin).
+
+**Tactics**
+
+- **Added:**
+  :tacn:`replace` and :tacn:`inversion` support registration of a
+  :g:`core.identity`\-like equality in :g:`Type`, such as HoTT's :g:`path`
+  (`#12847 <https://github.com/coq/coq/pull/12847>`_,
+  partially fixes `#12846 <https://github.com/coq/coq/issues/12846>`_,
+  by Hugo Herbelin).
+- **Fixed:**
+  Anomaly with :tacn:`injection` involving artificial
+  dependencies disappearing by reduction
+  (`#12816 <https://github.com/coq/coq/pull/12816>`_,
+  fixes `#12787 <https://github.com/coq/coq/issues/12787>`_,
+  by Hugo Herbelin).
+
+**Tactic language**
+
+- **Fixed:**
+  Miscellaneous issues with locating tactic errors
+  (`#13247 <https://github.com/coq/coq/pull/13247>`_,
+  fixes `#12773 <https://github.com/coq/coq/issues/12773>`_
+  and `#12992 <https://github.com/coq/coq/issues/12992>`_,
+  by Hugo Herbelin).
+
+**SSReflect**
+
+- **Fixed:**
+  Regression in error reporting after :tacn:`case <case (ssreflect)>`.
+  A generic error message "Could not fill dependent hole in apply" was
+  reported for any error following :tacn:`case <case (ssreflect)>` or
+  :tacn:`elim <elim (ssreflect)>`
+  (`#12857 <https://github.com/coq/coq/pull/12857>`_,
+  fixes `#12837 <https://github.com/coq/coq/issues/12837>`_,
+  by Enrico Tassi).
+
+**Commands and options**
+
+- **Fixed:**
+  Failures of :cmd:`Search` in the presence of primitive projections
+  (`#13301 <https://github.com/coq/coq/pull/13301>`_,
+  fixes `#13298 <https://github.com/coq/coq/issues/13298>`_,
+  by Hugo Herbelin).
+- **Fixed:**
+  :cmd:`Search` supports filtering on parts of identifiers which are
+  not proper identifiers themselves, such as :n:`"1"`
+  (`#13351 <https://github.com/coq/coq/pull/13351>`_,
+  fixes `#13349 <https://github.com/coq/coq/issues/13349>`_,
+  by Hugo Herbelin).
+
+**Tools**
+
+- **Fixed:**
+  Special symbols now escaped in the index produced by coqdoc,
+  avoiding collision with the syntax of the output format
+  (`#12754 <https://github.com/coq/coq/pull/12754>`_,
+  fixes `#12752 <https://github.com/coq/coq/issues/12752>`_,
+  by Hugo Herbelin).
+- **Fixed:**
+  The `details` environment added in the 8.12 release can now be used
+  as advertised in the reference manual
+  (`#12772 <https://github.com/coq/coq/pull/12772>`_,
+  by Thomas Letan).
+- **Fixed:**
+  Targets such as ``print-pretty-timed`` in ``coq_makefile``\-made
+  ``Makefile``\s no longer error in rare cases where ``--output-sync`` is not
+  passed to make and the timing output gets interleaved in just the wrong way
+  (`#13063 <https://github.com/coq/coq/pull/13063>`_, fixes `#13062
+  <https://github.com/coq/coq/issues/13062>`_, by Jason Gross).
+
+**CoqIDE**
+
+- **Fixed:**
+  View menu "Display parentheses"
+  (`#12794 <https://github.com/coq/coq/pull/12794>`_ and `#13067 <https://github.com/coq/coq/pull/13067>`_,
+  fixes `#12793 <https://github.com/coq/coq/issues/12793>`_,
+  by Jean-Christophe Léchenet and Hugo Herbelin).
+
+**Infrastructure and dependencies**
+
+- **Added:**
+  Coq is now tested against OCaml 4.11.1
+  (`#12972 <https://github.com/coq/coq/pull/12972>`_,
+  by Emilio Jesus Gallego Arias).
+- **Fixed:**
+  The reference manual can now build with Sphinx 3
+  (`#13011 <https://github.com/coq/coq/pull/13011>`_,
+  fixes `#12332 <https://github.com/coq/coq/issues/12332>`_,
+  by Théo Zimmermann and Jim Fehrle).
+
 Version 8.11
 ------------
 
 Summary of changes
 ~~~~~~~~~~~~~~~~~~
 
-The main changes brought by |Coq| version 8.11 are:
+The main changes brought by Coq version 8.11 are:
 
 - :ref:`Ltac2<811Ltac2>`, a new tactic language for writing more robust larger scale
   tactics, with built-in support for datatypes and the multi-goal tactic monad.
@@ -1256,7 +1376,7 @@ also the warning message in the :ref:`corresponding chapter
 <omega_chapter>`).
 
 The ``dev/doc/critical-bugs`` file documents the known critical bugs
-of |Coq| and affected releases. See the `Changes in 8.11+beta1`_
+of Coq and affected releases. See the `Changes in 8.11+beta1`_
 section and following sections for the detailed list of changes,
 including potentially breaking changes marked with **Changed**.
 
@@ -1269,7 +1389,7 @@ Maxime Dénès, Emilio Jesús Gallego Arias, Gaëtan Gilbert, Michael
 Soegtrop and Théo Zimmermann worked on maintaining and improving the
 continuous integration system and package building infrastructure.
 
-The OPAM repository for |Coq| packages has been maintained by
+The OPAM repository for Coq packages has been maintained by
 Guillaume Claret, Karl Palmskog, Matthieu Sozeau and Enrico Tassi with
 contributions from many users. A list of packages is available at
 https://coq.inria.fr/opam/www/.
@@ -1292,20 +1412,20 @@ Matthieu Sozeau, spanjel, Claude Stolze, Enrico Tassi, Laurent Théry,
 James R. Wilcox, Xia Li-yao, Théo Zimmermann
 
 Many power users helped to improve the design of the new features via
-the issue and pull request system, the |Coq| development mailing list,
+the issue and pull request system, the Coq development mailing list,
 the coq-club@inria.fr mailing list or the `Discourse forum
 <https://coq.discourse.group/>`_. It would be impossible to mention
 exhaustively the names of everybody who to some extent influenced the
 development.
 
-Version 8.11 is the sixth release of |Coq| developed on a time-based
+Version 8.11 is the sixth release of Coq developed on a time-based
 development cycle. Its development spanned 3 months from the release of
-|Coq| 8.10. Pierre-Marie Pédrot is the release manager and maintainer of this
+Coq 8.10. Pierre-Marie Pédrot is the release manager and maintainer of this
 release, assisted by Matthieu Sozeau. This release is the result of 2000+
 commits and 300+ PRs merged, closing 75+ issues.
 
 | Paris, November 2019,
-| Matthieu Sozeau for the |Coq| development team
+| Matthieu Sozeau for the Coq development team
 |
 
 
@@ -1463,8 +1583,8 @@ Changes in 8.11+beta1
   A simplification of parsing rules could cause a slight change of
   parsing precedences for the very rare users who defined notations
   with `constr` at level strictly between 100 and 200 and used these
-  notations on the right-hand side of a cast operator (`:`, `:>`,
-  `:>>`) (`#10963 <https://github.com/coq/coq/pull/10963>`_, by Théo
+  notations on the right-hand side of a cast operator (`:`, `<:`,
+  `<<:`) (`#10963 <https://github.com/coq/coq/pull/10963>`_, by Théo
   Zimmermann, simplification initially noticed by Jim Fehrle).
 
 **Tactics**
@@ -1957,7 +2077,7 @@ Version 8.10
 Summary of changes
 ~~~~~~~~~~~~~~~~~~
 
-|Coq| version 8.10 contains two major new features: support for a native
+Coq version 8.10 contains two major new features: support for a native
 fixed-precision integer type and a new sort :math:`\SProp` of strict
 propositions. It is also the result of refinements and stabilization of
 previous features, deprecations or removals of deprecated features,
@@ -2009,7 +2129,7 @@ reference manual. Here are the most important user-visible changes:
     inductive types
     (`#8965 <https://github.com/coq/coq/pull/8965>`_, by Jason Gross).
 
-  - Experimental: :ref:`Numeral Notations <numeral-notations>` now parse decimal
+  - Experimental: :ref:`Number Notations <number-notations>` now parse decimal
     constants such as ``1.02e+01`` or ``10.2``. Parsers added for :g:`Q` and :g:`R`.
     In the rare case when such numeral notations were used
     in a development along with :g:`Q` or :g:`R`, they may have to be removed or
@@ -2121,7 +2241,7 @@ the numerous changes to the implementation and improvements of
 interfaces. The file provides guidelines on porting a plugin to the new
 version and a plugin development tutorial originally made by Yves Bertot
 is now in `doc/plugin_tutorial`. The ``dev/doc/critical-bugs`` file
-documents the known critical bugs of |Coq| and affected releases.
+documents the known critical bugs of Coq and affected releases.
 
 The efficiency of the whole system has seen improvements thanks to
 contributions from Gaëtan Gilbert, Pierre-Marie Pédrot, and Maxime Dénès.
@@ -2129,7 +2249,7 @@ contributions from Gaëtan Gilbert, Pierre-Marie Pédrot, and Maxime Dénès.
 Maxime Dénès, Emilio Jesús Gallego Arias, Gaëtan Gilbert, Michael
 Soegtrop, Théo Zimmermann worked on maintaining and improving the
 continuous integration system and package building infrastructure.
-Coq is now continuously tested against OCaml trunk, in addition to the
+Coq is now continuously tested against the OCaml trunk, in addition to the
 oldest supported and latest OCaml releases.
 
 Coq's documentation for the development branch is now deployed
@@ -2138,7 +2258,7 @@ the ML API), https://coq.github.io/doc/master/refman (reference
 manual), and https://coq.github.io/doc/master/stdlib (documentation of
 the standard library). Similar links exist for the `v8.10` branch.
 
-The OPAM repository for |Coq| packages has been maintained by Guillaume
+The OPAM repository for Coq packages has been maintained by Guillaume
 Melquiond, Matthieu Sozeau, Enrico Tassi (who migrated it to opam 2)
 with contributions from many users. A list of packages is available at
 https://coq.inria.fr/opam/www/.
@@ -2160,19 +2280,19 @@ Tassi, Laurent Théry, Kamil Trzciński, whitequark, Théo Winterhalter,
 Xia Li-yao, Beta Ziliani and Théo Zimmermann.
 
 Many power users helped to improve the design of the new features via
-the issue and pull request system, the |Coq| development mailing list,
+the issue and pull request system, the Coq development mailing list,
 the coq-club@inria.fr mailing list or the new Discourse forum. It would
 be impossible to mention exhaustively the names of everybody who to some
 extent influenced the development.
 
-Version 8.10 is the fifth release of |Coq| developed on a time-based
+Version 8.10 is the fifth release of Coq developed on a time-based
 development cycle. Its development spanned 6 months from the release of
-|Coq| 8.9. Vincent Laporte is the release manager and maintainer of this
+Coq 8.9. Vincent Laporte is the release manager and maintainer of this
 release. This release is the result of ~2500 commits and ~650 PRs merged,
 closing 150+ issues.
 
 | Santiago de Chile, April 2019,
-| Matthieu Sozeau for the |Coq| development team
+| Matthieu Sozeau for the Coq development team
 |
 
 Other changes in 8.10+beta1
@@ -2281,7 +2401,7 @@ Other changes in 8.10+beta1
     parentheses on abbreviations shortening a strict prefix of an
     application, by Hugo Herbelin).
 
-  - :cmd:`Numeral Notation` now support inductive types in the input to
+  - :cmd:`Number Notation` now support inductive types in the input to
     printing functions (e.g., numeral notations can be defined for terms
     containing things like :g:`@cons nat O O`), and parsing functions now
     fully normalize terms including parameters of constructors (so that,
@@ -2761,7 +2881,7 @@ Version 8.9
 Summary of changes
 ~~~~~~~~~~~~~~~~~~
 
-|Coq| version 8.9 contains the result of refinements and stabilization
+Coq version 8.9 contains the result of refinements and stabilization
 of features and deprecations or removals of deprecated features,
 cleanups of the internals of the system and API along with a few new
 features. This release includes many user-visible changes, including
@@ -2779,10 +2899,10 @@ changes:
     manual).
 
   - Deprecated notations of the standard library will be removed in the
-    next version of |Coq|, see the next subsection for a script to
+    next version of Coq, see the next subsection for a script to
     ease porting, by Jason Gross and Jean-Christophe Léchenet.
 
-  - Added the :cmd:`Numeral Notation` command for registering decimal
+  - Added the :cmd:`Number Notation` command for registering decimal
     numeral notations for custom types, by Daniel de Rauglaudre, Pierre
     Letouzey and Jason Gross.
 
@@ -2842,7 +2962,7 @@ changes:
 
 - Tools: removed the ``gallina`` utility and the homebrewed ``Emacs`` mode.
 
-- Packaging: as in |Coq| 8.8.2, the Windows installer now includes many
+- Packaging: as in Coq 8.8.2, the Windows installer now includes many
   more external packages that can be individually selected for
   installation, by Michael Soegtrop.
 
@@ -2856,7 +2976,7 @@ interfaces. The file provides guidelines on porting a plugin to the new
 version and a plugin development tutorial kept in sync with Coq was
 introduced by Yves Bertot http://github.com/ybertot/plugin_tutorials.
 The new ``dev/doc/critical-bugs`` file documents the known critical bugs
-of |Coq| and affected releases.
+of Coq and affected releases.
 
 The efficiency of the whole system has seen improvements thanks to
 contributions from Gaëtan Gilbert, Pierre-Marie Pédrot, and Maxime Dénès.
@@ -2865,7 +2985,7 @@ Maxime Dénès, Emilio Jesús Gallego Arias, Gaëtan Gilbert, Michael
 Soegtrop, Théo Zimmermann worked on maintaining and improving the
 continuous integration system.
 
-The OPAM repository for |Coq| packages has been maintained by Guillaume
+The OPAM repository for Coq packages has been maintained by Guillaume
 Melquiond, Matthieu Sozeau, Enrico Tassi with contributions from many
 users. A list of packages is available at https://coq.inria.fr/opam/www/.
 
@@ -2885,23 +3005,23 @@ Tassi, Laurent Théry, Anton Trunov, whitequark, Théo Winterhalter,
 Zeimer, Beta Ziliani, Théo Zimmermann.
 
 Many power users helped to improve the design of the new features via
-the issue and pull request system, the |Coq| development mailing list or
+the issue and pull request system, the Coq development mailing list or
 the coq-club@inria.fr mailing list. It would be impossible to mention
 exhaustively the names of everybody who to some extent influenced the
 development.
 
-Version 8.9 is the fourth release of |Coq| developed on a time-based
+Version 8.9 is the fourth release of Coq developed on a time-based
 development cycle. Its development spanned 7 months from the release of
-|Coq| 8.8. The development moved to a decentralized merging process
+Coq 8.8. The development moved to a decentralized merging process
 during this cycle. Guillaume Melquiond was in charge of the release
 process and is the maintainer of this release. This release is the
 result of ~2,000 commits and ~500 PRs merged, closing 75+ issues.
 
-The |Coq| development team welcomed Vincent Laporte, a new |Coq|
-engineer working with Maxime Dénès in the |Coq| consortium.
+The Coq development team welcomed Vincent Laporte, a new Coq
+engineer working with Maxime Dénès in the Coq consortium.
 
 | Paris, November 2018,
-| Matthieu Sozeau for the |Coq| development team
+| Matthieu Sozeau for the Coq development team
 |
 
 Details of changes in 8.9+beta1
@@ -3134,7 +3254,7 @@ Version 8.8
 Summary of changes
 ~~~~~~~~~~~~~~~~~~
 
-|Coq| version 8.8 contains the result of refinements and stabilization of
+Coq version 8.8 contains the result of refinements and stabilization of
 features and deprecations, cleanups of the internals of the system along
 with a few new features. The main user visible changes are:
 
@@ -3196,12 +3316,12 @@ contributions from Gaëtan Gilbert, Pierre-Marie Pédrot, Maxime Dénès and
 Matthieu Sozeau and performance issue tracking by Jason Gross and Paul
 Steckler.
 
-The official wiki and the bugtracker of |Coq| migrated to the GitHub
+The official wiki and the bugtracker of Coq migrated to the GitHub
 platform, thanks to the work of Pierre Letouzey and Théo
 Zimmermann. Gaëtan Gilbert, Emilio Jesús Gallego Arias worked on
 maintaining and improving the continuous integration system.
 
-The OPAM repository for |Coq| packages has been maintained by Guillaume
+The OPAM repository for Coq packages has been maintained by Guillaume
 Melquiond, Matthieu Sozeau, Enrico Tassi with contributions from many
 users. A list of packages is available at https://coq.inria.fr/opam/www/.
 
@@ -3216,26 +3336,26 @@ Clément Pit-Claudel, Matthew Ryan, Matt Quinn, Sigurd Schneider, Bernhard
 Schommer, Michael Soegtrop, Matthieu Sozeau, Arnaud Spiwack, Paul Steckler,
 Enrico Tassi, Anton Trunov, Martin Vassor, Vadim Zaliva and Théo Zimmermann.
 
-Version 8.8 is the third release of |Coq| developed on a time-based
+Version 8.8 is the third release of Coq developed on a time-based
 development cycle. Its development spanned 6 months from the release of
-|Coq| 8.7 and was based on a public roadmap. The development process
+Coq 8.7 and was based on a public roadmap. The development process
 was coordinated by Matthieu Sozeau. Maxime Dénès was in charge of the
 release process. Théo Zimmermann is the maintainer of this release.
 
 Many power users helped to improve the design of the new features via
-the bug tracker, the pull request system, the |Coq| development mailing
+the bug tracker, the pull request system, the Coq development mailing
 list or the coq-club@inria.fr mailing list. Special thanks to the users who
 contributed patches and intensive brain-storming and code reviews,
 starting with Jason Gross, Ralf Jung, Robbert Krebbers and Amin Timany.
 It would however be impossible to mention exhaustively the names
 of everybody who to some extent influenced the development.
 
-The |Coq| consortium, an organization directed towards users and
+The Coq consortium, an organization directed towards users and
 supporters of the system, is now running and employs Maxime Dénès.
 The contacts of the Coq Consortium are Yves Bertot and Maxime Dénès.
 
 | Santiago de Chile, March 2018,
-| Matthieu Sozeau for the |Coq| development team
+| Matthieu Sozeau for the Coq development team
 |
 
 Details of changes in 8.8+beta1
@@ -3501,7 +3621,7 @@ Version 8.7
 Summary of changes
 ~~~~~~~~~~~~~~~~~~
 
-|Coq| version 8.7 contains the result of refinements, stabilization of features
+Coq version 8.7 contains the result of refinements, stabilization of features
 and cleanups of the internals of the system along with a few new features. The
 main user visible changes are:
 
@@ -3520,7 +3640,7 @@ main user visible changes are:
   and the extensibility of generated Makefiles, and to make ``_CoqProject`` files
   more palatable to IDEs by Enrico Tassi.
 
-|Coq| 8.7 involved a large amount of work on cleaning and speeding up the code
+Coq 8.7 involved a large amount of work on cleaning and speeding up the code
 base, notably the work of Pierre-Marie Pédrot on making the tactic-level system
 insensitive to existential variable expansion, providing a safer API to plugin
 writers and making the code more robust. The ``dev/doc/changes.txt`` file
@@ -3540,7 +3660,7 @@ Thomas Sibut-Pinote and Hugo Herbelin added support for side effect hooks in
 cbv, cbn and simpl. The side effects are provided via a plugin available at
 https://github.com/herbelin/reduction-effects/.
 
-The BigN, BigZ, BigQ libraries are no longer part of the |Coq| standard library,
+The BigN, BigZ, BigQ libraries are no longer part of the Coq standard library,
 they are now provided by a separate repository https://github.com/coq/bignums,
 maintained by Pierre Letouzey.
 
@@ -3554,7 +3674,7 @@ others, documented in the next subsection file.
 The mathematical proof language/declarative mode plugin was removed from the
 archive.
 
-The OPAM repository for |Coq| packages has been maintained by Guillaume Melquiond,
+The OPAM repository for Coq packages has been maintained by Guillaume Melquiond,
 Matthieu Sozeau, Enrico Tassi with contributions from many users. A list of
 packages is available at https://coq.inria.fr/opam/www/.
 
@@ -3579,29 +3699,29 @@ Maxime Dénès, who was also in charge of the release process. Théo Zimmermann 
 the maintainer of this release.
 
 Many power users helped to improve the design of the new features via the bug
-tracker, the pull request system, the |Coq| development mailing list or the
+tracker, the pull request system, the Coq development mailing list or the
 Coq-Club mailing list. Special thanks to the users who contributed patches and
 intensive brain-storming and code reviews, starting with Jason Gross, Ralf Jung,
 Robbert Krebbers, Xavier Leroy, Clément Pit–Claudel and Gabriel Scherer. It
 would however be impossible to mention exhaustively the names of everybody who
 to some extent influenced the development.
 
-Version 8.7 is the second release of |Coq| developed on a time-based development
-cycle. Its development spanned 9 months from the release of |Coq| 8.6 and was
+Version 8.7 is the second release of Coq developed on a time-based development
+cycle. Its development spanned 9 months from the release of Coq 8.6 and was
 based on a public road-map. It attracted many external contributions. Code
 reviews and continuous integration testing were systematically used before
 integration of new features, with an important focus given to compatibility and
-performance issues, resulting in a hopefully more robust release than |Coq| 8.6
+performance issues, resulting in a hopefully more robust release than Coq 8.6
 while maintaining compatibility.
 
-|Coq| Enhancement Proposals (CEPs for short) and open pull request discussions
+Coq Enhancement Proposals (CEPs for short) and open pull request discussions
 were used to discuss publicly the new features.
 
-The |Coq| consortium, an organization directed towards users and supporters of the
+The Coq consortium, an organization directed towards users and supporters of the
 system, is now upcoming and will rely on Inria’s newly created Foundation.
 
 | Paris, August 2017,
-| Matthieu Sozeau and the |Coq| development team
+| Matthieu Sozeau and the Coq development team
 |
 
 Potential compatibility issues
@@ -3871,9 +3991,9 @@ over 100 contributions integrated. The main user visible changes are:
 -  A new, faster state-of-the-art universe constraint checker, by
    Jacques-Henri Jourdan.
 
--  In |CoqIDE| and other asynchronous interfaces, more fine-grained
+-  In CoqIDE and other asynchronous interfaces, more fine-grained
    asynchronous processing and error reporting by Enrico Tassi, making
-   |Coq| capable of recovering from errors and continue processing the
+   Coq capable of recovering from errors and continue processing the
    document.
 
 -  More access to the proof engine features from Ltac: goal management
@@ -3920,7 +4040,7 @@ Matthieu Sozeau. The minimization algorithm has been improved by
 Matthieu Sozeau.
 
 The unifier has been improved by Hugo Herbelin and Matthieu Sozeau,
-fixing some incompatibilities introduced in |Coq| 8.5. Unification
+fixing some incompatibilities introduced in Coq 8.5. Unification
 constraints can now be left floating around and be seen by the user
 thanks to a new option. The Keyed Unification mode has been improved by
 Matthieu Sozeau.
@@ -3943,19 +4063,19 @@ the pretty-printing and user interface communication components.
 
 Frédéric Besson maintained the micromega tactic.
 
-The OPAM repository for |Coq| packages has been maintained by Guillaume
+The OPAM repository for Coq packages has been maintained by Guillaume
 Claret, Guillaume Melquiond, Matthieu Sozeau, Enrico Tassi and others. A
 list of packages is now available at https://coq.inria.fr/opam/www/.
 
 Packaging tools and software development kits were prepared by Michael
 Soegtrop with the help of Maxime Dénès and Enrico Tassi for Windows, and
 Maxime Dénès and Matthieu Sozeau for MacOS X. Packages are now regularly
-built on the continuous integration server. |Coq| now comes with a META
+built on the continuous integration server. Coq now comes with a META
 file usable with ocamlfind, contributed by Emilio Jesús Gallego Arias,
 Gregory Malecha, and Matthieu Sozeau.
 
 Matej Košík maintained and greatly improved the continuous integration
-setup and the testing of |Coq| contributions. He also contributed many API
+setup and the testing of Coq contributions. He also contributed many API
 improvements and code cleanups throughout the system.
 
 The contributors for this version are Bruno Barras, C.J. Bell, Yves
@@ -3972,7 +4092,7 @@ coordinated by Hugo Herbelin and Matthieu Sozeau with the help of Maxime
 Dénès, who was also in charge of the release process.
 
 Many power users helped to improve the design of the new features via
-the bug tracker, the pull request system, the |Coq| development mailing
+the bug tracker, the pull request system, the Coq development mailing
 list or the Coq-Club mailing list. Special thanks to the users who
 contributed patches and intensive brain-storming and code reviews,
 starting with Cyril Cohen, Jason Gross, Robbert Krebbers, Jonathan
@@ -3981,23 +4101,23 @@ Scherer and Beta Ziliani. It would however be impossible to mention
 exhaustively the names of everybody who to some extent influenced the
 development.
 
-Version 8.6 is the first release of |Coq| developed on a time-based
+Version 8.6 is the first release of Coq developed on a time-based
 development cycle. Its development spanned 10 months from the release of
 Coq 8.5 and was based on a public roadmap. To date, it contains more
-external contributions than any previous |Coq| system. Code reviews were
+external contributions than any previous Coq system. Code reviews were
 systematically done before integration of new features, with an
 important focus given to compatibility and performance issues, resulting
-in a hopefully more robust release than |Coq| 8.5.
+in a hopefully more robust release than Coq 8.5.
 
 Coq Enhancement Proposals (CEPs for short) were introduced by Enrico
 Tassi to provide more visibility and a discussion period on new
 features, they are publicly available https://github.com/coq/ceps.
 
 Started during this period, an effort is led by Yves Bertot and Maxime
-Dénès to put together a |Coq| consortium.
+Dénès to put together a Coq consortium.
 
 | Paris, November 2016,
-| Matthieu Sozeau and the |Coq| development team
+| Matthieu Sozeau and the Coq development team
 |
 
 Potential sources of incompatibilities
@@ -4252,7 +4372,7 @@ the backtracking behavior of tactics. Multiple goal handling paves the
 way for smarter automation tactics. It is currently used for simple goal
 manipulation such as goal reordering.
 
-The way |Coq| processes a document in batch and interactive mode has been
+The way Coq processes a document in batch and interactive mode has been
 redesigned by Enrico Tassi with help from Bruno Barras. Opaque proofs,
 the text between Proof and Qed, can be processed asynchronously,
 decoupling the checking of definitions and statements from the checking
@@ -4265,12 +4385,12 @@ already Required. All .vio files can be turned into complete .vo files
 in parallel. The same infrastructure also allows terminating tactics to
 be run in parallel on a set of goals via the ``par:`` goal selector.
 
-|CoqIDE| was modified to cope with asynchronous checking of the document.
-Its source code was also made separate from that of |Coq|, so that |CoqIDE|
+CoqIDE was modified to cope with asynchronous checking of the document.
+Its source code was also made separate from that of Coq, so that CoqIDE
 no longer has a special status among user interfaces, paving the way for
-decoupling its release cycle from that of |Coq| in the future.
+decoupling its release cycle from that of Coq in the future.
 
-Carst Tankink developed a |Coq| back-end for user interfaces built on
+Carst Tankink developed a Coq back-end for user interfaces built on
 Makarius Wenzel’s Prover IDE framework (PIDE), like PIDE/jEdit (with
 help from Makarius Wenzel) or PIDE/Coqoon (with help from Alexander
 Faithfull and Jesper Bengtson). The development of such features was
@@ -4304,7 +4424,7 @@ principles such as propositional extensionality and univalence, thanks
 to Maxime Dénès and Bruno Barras. To ensure compatibility with the
 univalence axiom, a new flag ``-indices-matter`` has been implemented,
 taking into account the universe levels of indices when computing the
-levels of inductive types. This supports using |Coq| as a tool to explore
+levels of inductive types. This supports using Coq as a tool to explore
 the relations between homotopy theory and type theory.
 
 Maxime Dénès and Benjamin Grégoire developed an implementation of
@@ -4334,13 +4454,13 @@ Matthieu Sozeau. Error messages for unification and type inference
 failures have been improved by Hugo Herbelin, Pierre-Marie Pédrot and
 Arnaud Spiwack.
 
-Pierre Courtieu contributed new features for using |Coq| through Proof
+Pierre Courtieu contributed new features for using Coq through Proof
 General and for better interactive experience (bullets, Search, etc).
 
 The efficiency of the whole system has been significantly improved
 thanks to contributions from Pierre-Marie Pédrot.
 
-A distribution channel for |Coq| packages using the OPAM tool has been
+A distribution channel for Coq packages using the OPAM tool has been
 initiated by Thomas Braibant and developed by Guillaume Claret, with
 contributions by Enrico Tassi and feedback from Hugo Herbelin.
 
@@ -4357,7 +4477,7 @@ Jonathan Leivent, Greg Malecha, Clément Pit-Claudel, Marc Lasson, Lionel
 Rieg. It would however be impossible to mention with precision all names
 of people who to some extent influenced the development.
 
-Version 8.5 is one of the most important releases of |Coq|. Its development
+Version 8.5 is one of the most important releases of Coq. Its development
 spanned over about 3 years and a half with about one year of
 beta-testing. General maintenance during part or whole of this period
 has been done by Pierre Boutillier, Pierre Courtieu, Maxime Dénès, Hugo
@@ -4369,7 +4489,7 @@ Mahboubi, Jean-Marc Notin, Yann Régis-Gianas, François Ripault, Carst
 Tankink. Maxime Dénès coordinated the release process.
 
 | Paris, January 2015, revised December 2015,
-| Hugo Herbelin, Matthieu Sozeau and the |Coq| development team
+| Hugo Herbelin, Matthieu Sozeau and the Coq development team
 |
 
 Potential sources of incompatibilities
@@ -5158,7 +5278,7 @@ Other bugfixes
 - #4503: mixing universe polymorphic and monomorphic variables and definitions in sections is unsupported.
 - #4519: oops, global shadowed local universe level bindings.
 - #4506: Anomaly: File "pretyping/indrec.ml", line 169, characters 14-20: Assertion failed.
-- #4548: Coqide crashes when going back one command
+- #4548: CoqIDE crashes when going back one command
 
 Details of changes in 8.5pl2
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -5273,7 +5393,7 @@ Summary of changes
 
 Coq version 8.4 contains the result of three long-term projects: a new
 modular library of arithmetic by Pierre Letouzey, a new proof engine by
-Arnaud Spiwack and a new communication protocol for |CoqIDE| by Vincent
+Arnaud Spiwack and a new communication protocol for CoqIDE by Vincent
 Gross.
 
 The new modular library of arithmetic extends, generalizes and unifies
@@ -5295,14 +5415,14 @@ goals simultaneously, for reordering goals, all features which are
 planned for the next release. The new proof engine forced Pierre Letouzey
 to reimplement info and Show Script differently.
 
-Before version 8.4, |CoqIDE| was linked to |Coq| with the graphical
-interface living in a separate thread. From version 8.4, |CoqIDE| is a
-separate process communicating with |Coq| through a textual channel. This
-allows for a more robust interfacing, the ability to interrupt |Coq|
+Before version 8.4, CoqIDE was linked to Coq with the graphical
+interface living in a separate thread. From version 8.4, CoqIDE is a
+separate process communicating with Coq through a textual channel. This
+allows for a more robust interfacing, the ability to interrupt Coq
 without interrupting the interface, and the ability to manage several
 sessions in parallel. Relying on the infrastructure work made by Vincent
 Gross, Pierre Letouzey, Pierre Boutillier and Pierre-Marie Pédrot
-contributed many various refinements of |CoqIDE|.
+contributed many various refinements of CoqIDE.
 
 Coq 8.4 also comes with a bunch of various smaller-scale changes
 and improvements regarding the different components of the system.
@@ -5313,7 +5433,7 @@ addition of :math:`\eta`-conversion is justified by the confidence that
 the formulation of the Calculus of Inductive Constructions based on
 typed equality (such as the one considered in Lee and Werner to build a
 set-theoretic model of CIC :cite:`LeeWerner11`) is
-applicable to the concrete implementation of |Coq|.
+applicable to the concrete implementation of Coq.
 
 The underlying logic benefited also from a refinement of the guard
 condition for fixpoints by Pierre Boutillier, the point being that it is
@@ -5394,7 +5514,7 @@ Coq through Proof General.
 The Dp plugin has been removed. Use the plugin provided with Why 3
 instead (http://why3.lri.fr/).
 
-Under the hood, the |Coq| architecture benefited from improvements in
+Under the hood, the Coq architecture benefited from improvements in
 terms of efficiency and robustness, especially regarding universes
 management and existential variables management, thanks to Pierre
 Letouzey and Yann Régis-Gianas with contributions from Stéphane Glondu
@@ -5703,19 +5823,19 @@ Extraction
 
 CoqIDE
 
-- Coqide now runs coqtop as separated process, making it more robust:
+- CoqIDE now runs coqtop as separated process, making it more robust:
   coqtop subprocess can be interrupted, or even killed and relaunched
   (cf button "Restart Coq", ex-"Go to Start"). For allowing such
   interrupts, the Windows version of coqide now requires Windows >= XP
   SP1.
-- The communication between CoqIDE and Coqtop is now done via a dialect
+- The communication between CoqIDE and coqtop is now done via a dialect
   of XML (DOC TODO).
 - The backtrack engine of CoqIDE has been reworked, it now uses the
   "Backtrack" command similarly to Proof General.
-- The Coqide parsing of sentences has be reworked and now supports
+- The CoqIDE parsing of sentences has be reworked and now supports
   tactic delimitation via { }.
-- Coqide now accepts the Abort command (wish #2357).
-- Coqide can read coq_makefile files as "project file" and use it to
+- CoqIDE now accepts the Abort command (wish #2357).
+- CoqIDE can read coq_makefile files as "project file" and use it to
   set automatically options to send to coqtop.
 - Preference files have moved to $XDG_CONFIG_HOME/coq and accelerators
   are not stored as a list anymore.
@@ -5785,7 +5905,7 @@ Module System
 
 CoqIDE
 
-- Coqide now supports the "Restart" command, and "Undo" (with a warning).
+- CoqIDE now supports the "Restart" command, and "Undo" (with a warning).
   Better support for "Abort".
 
 Details of changes in 8.4
@@ -5887,8 +6007,8 @@ more robust basis.
 
 Though invisible from outside, Arnaud Spiwack improved the general
 process of management of existential variables. Pierre Letouzey and
-Stéphane Glondu improved the compilation scheme of the |Coq| archive.
-Vincent Gross provided support to |CoqIDE|. Jean-Marc Notin provided
+Stéphane Glondu improved the compilation scheme of the Coq archive.
+Vincent Gross provided support to CoqIDE. Jean-Marc Notin provided
 support for benchmarking and archiving.
 
 Many users helped by reporting problems, providing patches, suggesting
@@ -6258,16 +6378,16 @@ Summary of changes
 Coq version 8.2 adds new features, new libraries and improves on many
 various aspects.
 
-Regarding the language of |Coq|, the main novelty is the introduction by
+Regarding the language of Coq, the main novelty is the introduction by
 Matthieu Sozeau of a package of commands providing Haskell-style typeclasses.
 Typeclasses, which come with a few convenient features such as
 type-based resolution of implicit arguments, play a new landmark role
-in the architecture of |Coq| with respect to automation. For
+in the architecture of Coq with respect to automation. For
 instance, thanks to typeclass support, Matthieu Sozeau could
 implement a new resolution-based version of the tactics dedicated to
 rewriting on arbitrary transitive relations.
 
-Another major improvement of |Coq| 8.2 is the evolution of the arithmetic
+Another major improvement of Coq 8.2 is the evolution of the arithmetic
 libraries and of the tools associated to them. Benjamin Grégoire and
 Laurent Théry contributed a modular library for building arbitrarily
 large integers from bounded integers while Evgeny Makarov contributed a
@@ -6291,7 +6411,7 @@ Arnaud Spiwack developed a library of 31-bits machine integers and,
 relying on Benjamin Grégoire and Laurent Théry’s library, delivered a
 library of unbounded integers in base :math:`2^{31}`. As importantly, he
 developed a notion of “retro-knowledge” so as to safely extend the
-kernel-located bytecode-based efficient evaluation algorithm of |Coq|
+kernel-located bytecode-based efficient evaluation algorithm of Coq
 version 8.1 to use 31-bits machine arithmetic for efficiently computing
 with the library of integers he developed.
 
@@ -6323,16 +6443,16 @@ the Scheme command and of injection.
 Bruno Barras implemented the ``coqchk`` tool: this is a stand-alone
 type checker that can be used to certify .vo files. Especially, as this
 verifier runs in a separate process, it is granted not to be “hijacked”
-by virtually malicious extensions added to |Coq|.
+by virtually malicious extensions added to Coq.
 
 Yves Bertot, Jean-Christophe Filliâtre, Pierre Courtieu and Julien
 Forest acted as maintainers of features they implemented in previous
-versions of |Coq|.
+versions of Coq.
 
-Julien Narboux contributed to |CoqIDE|. Nicolas Tabareau made the
+Julien Narboux contributed to CoqIDE. Nicolas Tabareau made the
 adaptation of the interface of the old “setoid rewrite” tactic to the
-new version. Lionel Mamane worked on the interaction between |Coq| and its
-external interfaces. With Samuel Mimram, he also helped making |Coq|
+new version. Lionel Mamane worked on the interaction between Coq and its
+external interfaces. With Samuel Mimram, he also helped making Coq
 compatible with recent software tools. Russell O’Connor, Cezary
 Kaliszyk, Milad Niqui contributed to improve the libraries of integers,
 rational, and real numbers. We also thank many users and partners for
@@ -6823,7 +6943,7 @@ Extraction
   not happen anymore.
 
 - The command Extract Inductive has now a syntax for infix notations. This
-  allows in particular to map Coq lists and pairs onto Caml ones:
+  allows in particular to map Coq lists and pairs onto OCaml ones:
 
   + Extract Inductive list => list [ "[]" "(::)" ].
   + Extract Inductive prod => "(*)" [ "(,)" ].
@@ -6886,7 +7006,7 @@ Summary of changes
 Coq version 8.1 adds various new functionalities.
 
 Benjamin Grégoire implemented an alternative algorithm to check the
-convertibility of terms in the |Coq| type checker. This alternative
+convertibility of terms in the Coq type checker. This alternative
 algorithm works by compilation to an efficient bytecode that is
 interpreted in an abstract machine similar to Xavier Leroy’s ZINC
 machine. Convertibility is performed by comparing the normal forms. This
@@ -6916,7 +7036,7 @@ Claudio Sacerdoti Coen added new tactic features.
 
 Hugo Herbelin implemented matching on disjunctive patterns.
 
-New mechanisms made easier the communication between |Coq| and external
+New mechanisms made easier the communication between Coq and external
 provers. Nicolas Ayache and Jean-Christophe Filliâtre implemented
 connections with the provers cvcl, Simplify and zenon. Hugo Herbelin
 implemented an experimental protocol for calling external tools from the
@@ -6930,7 +7050,7 @@ unresolved implicit has been implemented by Hugo Herbelin.
 
 Laurent Théry’s contribution on strings and Pierre Letouzey and
 Jean-Christophe Filliâtre’s contribution on finite maps have been
-integrated to the |Coq| standard library. Pierre Letouzey developed a
+integrated to the Coq standard library. Pierre Letouzey developed a
 library about finite sets “à la Objective Caml”. With Jean-Marc Notin,
 he extended the library on lists. Pierre Letouzey’s contribution on
 rational numbers has been integrated and extended.
@@ -7180,7 +7300,7 @@ Tools
 - Tool coq_makefile now removes custom targets that are file names in
   "make clean"
 - New environment variable COQREMOTEBROWSER to set the command invoked
-  to start the remote browser both in Coq and coqide. Standard syntax:
+  to start the remote browser both in Coq and CoqIDE. Standard syntax:
   "%s" is the placeholder for the URL.
 
 Details of changes in 8.1gamma
@@ -7256,7 +7376,7 @@ Version 8.0
 Summary of changes
 ~~~~~~~~~~~~~~~~~~
 
-Coq version 8 is a major revision of the |Coq| proof assistant. First, the
+Coq version 8 is a major revision of the Coq proof assistant. First, the
 underlying logic is slightly different. The so-called *impredicativity*
 of the sort Set has been dropped. The main reason is that it is
 inconsistent with the principle of description which is quite a useful
@@ -7285,7 +7405,7 @@ main motivations were
 Together with the revision of the concrete syntax, a new mechanism of
 *notation scopes* permits to reuse the same symbols (typically +,
 -, \*, /, <, <=) in various mathematical theories without any
-ambiguities for |Coq|, leading to a largely improved readability of |Coq|
+ambiguities for Coq, leading to a largely improved readability of Coq
 scripts. New commands to easily add new symbols are also provided.
 
 Coming with the new syntax of terms, a slight reform of the tactic
@@ -7295,29 +7415,29 @@ easier to use and to remember.
 
 Thirdly, a restructuring and uniformization of the standard library of
 Coq has been performed. There is now just one Leibniz equality usable
-for all the different kinds of |Coq| objects. Also, the set of real
+for all the different kinds of Coq objects. Also, the set of real
 numbers now lies at the same level as the sets of natural and integer
 numbers. Finally, the names of the standard properties of numbers now
 follow a standard pattern and the symbolic notations for the standard
 definitions as well.
 
-The fourth point is the release of |CoqIDE|, a new graphical gtk2-based
-interface fully integrated with |Coq|. Close in style to the Proof General
-Emacs interface, it is faster and its integration with |Coq| makes
+The fourth point is the release of CoqIDE, a new graphical gtk2-based
+interface fully integrated with Coq. Close in style to the Proof General
+Emacs interface, it is faster and its integration with Coq makes
 interactive developments more friendly. All mathematical Unicode symbols
-are usable within |CoqIDE|.
+are usable within CoqIDE.
 
-Finally, the module system of |Coq| completes the picture of |Coq| version
+Finally, the module system of Coq completes the picture of Coq version
 8.0. Though released with an experimental status in the previous version
 7.4, it should be considered as a salient feature of the new version.
 
-Besides, |Coq| comes with its load of novelties and improvements: new or
+Besides, Coq comes with its load of novelties and improvements: new or
 improved tactics (including a new tactic for solving first-order
 statements), new management commands, extended libraries.
 
 Bruno Barras and Hugo Herbelin have been the main contributors of the
 reflection and the implementation of the new syntax. The smart automatic
-translator from old to new syntax released with |Coq| is also their work
+translator from old to new syntax released with Coq is also their work
 with contributions by Olivier Desmettre.
 
 Hugo Herbelin is the main designer and implementer of the notion of
@@ -7330,21 +7450,21 @@ Pierre Corbineau is the main designer and implementer of the new tactic
 for solving first-order statements in presence of inductive types. He is
 also the maintainer of the non-domain specific automation tactics.
 
-Benjamin Monate is the developer of the |CoqIDE| graphical interface with
+Benjamin Monate is the developer of the CoqIDE graphical interface with
 contributions by Jean-Christophe Filliâtre, Pierre Letouzey, Claude
 Marché and Bruno Barras.
 
-Claude Marché coordinated the edition of the Reference Manual for |Coq|
+Claude Marché coordinated the edition of the Reference Manual for Coq
 V8.0.
 
 Pierre Letouzey and Jacek Chrząszcz respectively maintained the
-extraction tool and module system of |Coq|.
+extraction tool and module system of Coq.
 
 Jean-Christophe Filliâtre, Pierre Letouzey, Hugo Herbelin and other
 contributors from Sophia-Antipolis and Nijmegen participated in
 extending the library.
 
-Julien Narboux built a NSIS-based automatic |Coq| installation tool for
+Julien Narboux built a NSIS-based automatic Coq installation tool for
 the Windows platform.
 
 Hugo Herbelin and Christine Paulin coordinated the development which was

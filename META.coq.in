@@ -223,7 +223,7 @@ package "toplevel" (
   description = "Coq Toplevel"
   version     = "8.13"
 
-  requires    = "num, coq.stm"
+  requires    = "coq.stm"
   directory   = "toplevel"
 
   archive(byte)    = "toplevel.cma"
@@ -327,7 +327,7 @@ package "plugins" (
     description = "Coq micromega plugin"
     version     = "8.13"
 
-    requires    = "num, coq.plugins.ltac"
+    requires    = "coq.plugins.ltac"
     directory   = "micromega"
 
     archive(byte)    = "micromega_plugin.cmo"
@@ -352,19 +352,19 @@ package "plugins" (
     plugin(native)  = "zify_plugin.cmxs"
   )
 
-  package "setoid_ring" (
+  package "ring" (
 
-    description = "Coq newring plugin"
+    description = "Coq ring plugin"
     version     = "8.13"
 
     requires    = ""
-    directory   = "setoid_ring"
+    directory   = "ring"
 
-    archive(byte)    = "newring_plugin.cmo"
-    archive(native)  = "newring_plugin.cmx"
+    archive(byte)    = "ring_plugin.cmo"
+    archive(native)  = "ring_plugin.cmx"
 
-    plugin(byte)    = "newring_plugin.cmo"
-    plugin(native)  = "newring_plugin.cmxs"
+    plugin(byte)    = "ring_plugin.cmo"
+    plugin(native)  = "ring_plugin.cmxs"
   )
 
   package "extraction" (

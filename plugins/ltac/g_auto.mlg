@@ -18,8 +18,6 @@ open Pcoq.Constr
 open Pltac
 open Hints
 
-let wit_hyp = wit_var
-
 }
 
 DECLARE PLUGIN "ltac_plugin"
@@ -118,12 +116,25 @@ END
 
 let make_depth n = snd (Eauto.make_dimension n None)
 
+(* deprecated in 8.13; the second int_or_var will be removed *)
+let deprecated_eauto_bfs =
+  CWarnings.create
+    ~name:"eauto_bfs" ~category:"deprecated"
+    (fun () -> Pp.str "The syntax [eauto @int_or_var @int_or_var] is deprecated. Use [bfs eauto] instead.")
+
+let deprecated_bfs tacname =
+  CWarnings.create
+    ~name:"eauto_bfs" ~category:"deprecated"
+    (fun () -> Pp.str "The syntax [" ++ Pp.str tacname ++ Pp.str "@int_or_var @int_or_var] is deprecated. No replacement yet.")
+
 }
 
 TACTIC EXTEND eauto
 | [ "eauto" int_or_var_opt(n) int_or_var_opt(p) auto_using(lems)
     hintbases(db) ] ->
-    { Eauto.gen_eauto (Eauto.make_dimension n p) (eval_uconstrs ist lems) db }
+    {
+      ( match n,p with Some _, Some _ -> deprecated_eauto_bfs () | _ -> () );
+      Eauto.gen_eauto (Eauto.make_dimension n p) (eval_uconstrs ist lems) db }
 END
 
 TACTIC EXTEND new_eauto
@@ -137,19 +148,29 @@ END
 TACTIC EXTEND debug_eauto
 | [ "debug" "eauto" int_or_var_opt(n) int_or_var_opt(p) auto_using(lems)
     hintbases(db) ] ->
-    { Eauto.gen_eauto ~debug:Debug (Eauto.make_dimension n p) (eval_uconstrs ist lems) db }
+    {
+      ( match n,p with Some _, Some _ -> (deprecated_bfs "debug eauto") () | _ -> () );
+      Eauto.gen_eauto ~debug:Debug (Eauto.make_dimension n p) (eval_uconstrs ist lems) db }
 END
 
 TACTIC EXTEND info_eauto
 | [ "info_eauto" int_or_var_opt(n) int_or_var_opt(p) auto_using(lems)
     hintbases(db) ] ->
-    { Eauto.gen_eauto ~debug:Info (Eauto.make_dimension n p) (eval_uconstrs ist lems) db }
+    {
+      ( match n,p with Some _, Some _ -> (deprecated_bfs "info_eauto") () | _ -> () );
+      Eauto.gen_eauto ~debug:Info (Eauto.make_dimension n p) (eval_uconstrs ist lems) db }
 END
 
 TACTIC EXTEND dfs_eauto
 | [ "dfs" "eauto" int_or_var_opt(p) auto_using(lems)
       hintbases(db) ] ->
     { Eauto.gen_eauto (Eauto.make_dimension p None) (eval_uconstrs ist lems) db }
+END
+
+TACTIC EXTEND bfs_eauto
+| [ "bfs" "eauto" int_or_var_opt(p) auto_using(lems)
+      hintbases(db) ] ->
+    { Eauto.gen_eauto (true, Eauto.make_depth p) (eval_uconstrs ist lems) db }
 END
 
 TACTIC EXTEND autounfold
@@ -242,10 +263,21 @@ ARGUMENT EXTEND opthints
 END
 
 VERNAC COMMAND EXTEND HintCut CLASSIFIED AS SIDEFF
-| #[ locality = Attributes.locality; ] [ "Hint" "Cut" "[" hints_path(p) "]" opthints(dbnames) ] -> {
-        let entry = Hints.HintsCutEntry (Hints.glob_hints_path p) in
-        let locality = if Locality.make_section_locality locality then Goptions.OptLocal else Goptions.OptGlobal in
-        Hints.add_hints ~locality
-          (match dbnames with None -> ["core"] | Some l -> l) entry;
+| #[ locality = Attributes.option_locality; ] [ "Hint" "Cut" "[" hints_path(p) "]" opthints(dbnames) ] -> {
+  let open Goptions in
+  let entry = Hints.HintsCutEntry (Hints.glob_hints_path p) in
+  let () = match locality with
+  | OptGlobal ->
+    if Global.sections_are_opened () then
+    CErrors.user_err Pp.(str
+      "This command does not support the global attribute in sections.");
+  | OptExport ->
+    if Global.sections_are_opened () then
+    CErrors.user_err Pp.(str
+      "This command does not support the export attribute in sections.");
+  | OptDefault | OptLocal -> ()
+  in
+  Hints.add_hints ~locality
+    (match dbnames with None -> ["core"] | Some l -> l) entry;
  }
 END

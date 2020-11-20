@@ -111,14 +111,12 @@ let get_mind_prefix env mind =
    match !name with
    | NotLinked -> ""
    | Linked s -> s
-   | LinkedInteractive s -> s
 
 let get_const_prefix env c =
    let _,(nameref,_) = lookup_constant_key c env in
    match !nameref with
    | NotLinked -> ""
    | Linked s -> s
-   | LinkedInteractive s -> s
 
 (* A generic map function *)
 
@@ -433,8 +431,8 @@ module Cache =
     module ConstrHash =
     struct
       type t = constructor
-      let equal = eq_constructor
-      let hash = constructor_hash
+      let equal = Construct.CanOrd.equal
+      let hash = Construct.CanOrd.hash
     end
 
     module ConstrTable = Hashtbl.Make(ConstrHash)

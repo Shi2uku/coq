@@ -103,7 +103,7 @@ CORESRCDIRS:=\
 
 PLUGINDIRS:=\
   omega		micromega \
-  setoid_ring 	extraction \
+  ring 	extraction \
   cc 		funind 		firstorder 	derive \
   rtauto 	nsatz           syntax          btauto \
   ssrmatching	ltac		ssr             ssrsearch
@@ -122,7 +122,7 @@ LIBCOQRUN:=kernel/byterun/lib$(COQRUN).a
 DLLCOQRUN:=$(dir $(LIBCOQRUN))dll$(COQRUN)$(DLLEXT)
 
 BYTERUN:=$(addprefix kernel/byterun/, \
-  coq_fix_code.o coq_memory.o coq_values.o coq_interp.o )
+  coq_fix_code.o coq_float64.o coq_memory.o coq_values.o coq_interp.o )
 
 # LINK ORDER:
 # respecting this order is useful for developers that want to load or link
@@ -140,7 +140,7 @@ CORECMA:=config/config.cma clib/clib.cma lib/lib.cma kernel/kernel.cma library/l
 
 OMEGACMO:=plugins/omega/omega_plugin.cmo
 MICROMEGACMO:=plugins/micromega/micromega_plugin.cmo
-RINGCMO:=plugins/setoid_ring/newring_plugin.cmo
+RINGCMO:=plugins/ring/ring_plugin.cmo
 NSATZCMO:=plugins/nsatz/nsatz_plugin.cmo
 EXTRACTIONCMO:=plugins/extraction/extraction_plugin.cmo
 FUNINDCMO:=plugins/funind/recdef_plugin.cmo
@@ -149,11 +149,9 @@ CCCMO:=plugins/cc/cc_plugin.cmo
 BTAUTOCMO:=plugins/btauto/btauto_plugin.cmo
 RTAUTOCMO:=plugins/rtauto/rtauto_plugin.cmo
 SYNTAXCMO:=$(addprefix plugins/syntax/, \
-        r_syntax_plugin.cmo \
 	int63_syntax_plugin.cmo \
 	float_syntax_plugin.cmo \
-	numeral_notation_plugin.cmo \
-	string_notation_plugin.cmo)
+	number_string_notation_plugin.cmo)
 DERIVECMO:=plugins/derive/derive_plugin.cmo
 LTACCMO:=plugins/ltac/ltac_plugin.cmo plugins/ltac/tauto_plugin.cmo
 SSRMATCHINGCMO:=plugins/ssrmatching/ssrmatching_plugin.cmo

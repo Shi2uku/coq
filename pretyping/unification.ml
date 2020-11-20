@@ -38,7 +38,7 @@ type metabinding = (metavariable * EConstr.constr * (instance_constraint * insta
 type subst0 =
   (evar_map *
     metabinding list *
-      (Environ.env * EConstr.existential * EConstr.t) list)
+      ((Environ.env * int) * EConstr.existential * EConstr.t) list)
 
 module RelDecl = Context.Rel.Declaration
 module NamedDecl = Context.Named.Declaration
@@ -134,8 +134,8 @@ let abstract_list_all env evd typ c l =
     | Type_errors.TypeError (env',x) ->
         (* FIXME: plug back the typing information *)
         error_cannot_find_well_typed_abstraction env evd p l None
-    | Pretype_errors.PretypeError (env',evd,TypingError x) ->
-        error_cannot_find_well_typed_abstraction env evd p l (Some (env',x)) in
+    | Pretype_errors.PretypeError (env',evd,e) ->
+        error_cannot_find_well_typed_abstraction env evd p l (Some (env',e)) in
   evd,(p,typp)
 
 let set_occurrences_of_last_arg n =
@@ -227,7 +227,7 @@ let solve_pattern_eqn_array (env,nb) f l c (sigma,metasubst,evarsubst : subst0) 
     | Evar ev ->
         let env' = pop_rel_context nb env in
         let sigma,c = pose_all_metas_as_evars env' sigma c in
-        sigma,metasubst,(env,ev,solve_pattern_eqn env sigma l c)::evarsubst
+        sigma,metasubst,((env,nb),ev,solve_pattern_eqn env sigma l c)::evarsubst
     | _ -> assert false
 
 let push d (env,n) = (push_rel_assum d env,n+1)
@@ -547,10 +547,10 @@ let oracle_order env cf1 cf2 =
       | Some k2 ->
         match k1, k2 with
         | IsProj (p, _), IsKey (ConstKey (p',_))
-          when Constant.equal (Projection.constant p) p' ->
+          when Environ.QConstant.equal env (Projection.constant p) p' ->
           Some (not (Projection.unfolded p))
         | IsKey (ConstKey (p,_)), IsProj (p', _)
-          when Constant.equal p (Projection.constant p') ->
+          when Environ.QConstant.equal env p (Projection.constant p') ->
           Some (Projection.unfolded p')
         | _ ->
           Some (Conv_oracle.oracle_order (fun x -> x)
@@ -687,6 +687,17 @@ let eta_constructor_app env sigma f l1 term =
       | _ -> assert false)
   | _ -> assert false
 
+(* If the terms are irrelevant, check that they have the same type. *)
+let careful_infer_conv ~pb ~ts env sigma m n =
+  if Retyping.relevance_of_term env sigma m == Sorts.Irrelevant &&
+     Retyping.relevance_of_term env sigma n == Sorts.Irrelevant
+  then
+    let tm = Retyping.get_type_of env sigma m in
+    let tn = Retyping.get_type_of env sigma n in
+    Option.bind (infer_conv ~pb:CONV ~ts env sigma tm tn)
+      (fun sigma -> infer_conv ~pb ~ts env sigma m n)
+  else infer_conv ~pb ~ts env sigma m n
+
 let rec unify_0_with_initial_metas (sigma,ms,es as subst : subst0) conv_at_top env cv_pb flags m n =
   let rec unirec_rec (curenv,nb as curenvnb) pb opt ((sigma,metasubst,evarsubst) as substn : subst0) curm curn =
     let cM = Evarutil.whd_head_evar sigma curm
@@ -758,21 +769,21 @@ let rec unify_0_with_initial_metas (sigma,ms,es as subst : subst0) conv_at_top e
             | Some sigma ->
               sigma, metasubst, evarsubst
             | None ->
-              sigma,metasubst,((curenv,ev,cN)::evarsubst)
+              sigma,metasubst,((curenvnb,ev,cN)::evarsubst)
             end
         | Evar (evk,_ as ev), _
             when is_evar_allowed flags evk
               && not (occur_evar sigma evk cN) ->
             let cmvars = free_rels sigma cM and cnvars = free_rels sigma cN in
               if Int.Set.subset cnvars cmvars then
-                sigma,metasubst,((curenv,ev,cN)::evarsubst)
+                sigma,metasubst,((curenvnb,ev,cN)::evarsubst)
               else error_cannot_unify_local curenv sigma (m,n,cN)
         | _, Evar (evk,_ as ev)
             when is_evar_allowed flags evk
               && not (occur_evar sigma evk cM) ->
             let cmvars = free_rels sigma cM and cnvars = free_rels sigma cN in
               if Int.Set.subset cmvars cnvars then
-                sigma,metasubst,((curenv,ev,cM)::evarsubst)
+                sigma,metasubst,((curenvnb,ev,cM)::evarsubst)
               else error_cannot_unify_local curenv sigma (m,n,cN)
         | Sort s1, Sort s2 ->
             (try
@@ -796,7 +807,7 @@ let rec unify_0_with_initial_metas (sigma,ms,es as subst : subst0) conv_at_top e
         | _, LetIn (_,a,_,c) -> unirec_rec curenvnb pb opt substn cM (subst1 a c)
 
         (* Fast path for projections. *)
-        | Proj (p1,c1), Proj (p2,c2) when Constant.equal
+        | Proj (p1,c1), Proj (p2,c2) when Environ.QConstant.equal env
             (Projection.constant p1) (Projection.constant p2) ->
           (try unify_same_proj curenvnb cv_pb {opt with at_top = true}
                substn c1 c2
@@ -844,7 +855,7 @@ let rec unify_0_with_initial_metas (sigma,ms,es as subst : subst0) conv_at_top e
 
         | Case (ci1,p1,_,c1,cl1), Case (ci2,p2,_,c2,cl2) ->
             (try
-             if not (eq_ind ci1.ci_ind ci2.ci_ind) then error_cannot_unify curenv sigma (cM,cN);
+             if not (Ind.CanOrd.equal ci1.ci_ind ci2.ci_ind) then error_cannot_unify curenv sigma (cM,cN);
              let opt' = {opt with at_top = true; with_types = false} in
                Array.fold_left2 (unirec_rec curenvnb CONV {opt with at_top = true})
                (unirec_rec curenvnb CONV opt'
@@ -914,7 +925,7 @@ let rec unify_0_with_initial_metas (sigma,ms,es as subst : subst0) conv_at_top e
         match EConstr.kind sigma c' with
         | Meta _ -> true
         | Evar _ -> true
-        | Const (c, u) -> Constant.equal c (Projection.constant p)
+        | Const (c, u) -> Environ.QConstant.equal env c (Projection.constant p)
         | _ -> false
       in
       let expand_proj c c' l =
@@ -1127,7 +1138,7 @@ let rec unify_0_with_initial_metas (sigma,ms,es as subst : subst0) conv_at_top e
       None
     else
       let ans = match flags.modulo_conv_on_closed_terms with
-        | Some convflags -> infer_conv ~pb:cv_pb ~ts:convflags env sigma m n
+        | Some convflags -> careful_infer_conv ~pb:cv_pb ~ts:convflags env sigma m n
         | _ -> constr_cmp cv_pb env sigma flags m n in
       match ans with
       | Some sigma -> ans
@@ -1346,7 +1357,7 @@ let w_merge env with_types flags (evd,metas,evars : subst0) =
 
     (* Process evars *)
     match evars with
-    | (curenv,(evk,_ as ev),rhs)::evars' ->
+    | ((curenv,nb),(evk,_ as ev),rhs)::evars' ->
         if Evd.is_defined evd evk then
           let v = mkEvar ev in
           let (evd,metas',evars'') =
@@ -1365,7 +1376,8 @@ let w_merge env with_types flags (evd,metas,evars : subst0) =
                   w_merge_rec evd' metas evars eqns
               else
                 let evd' =
-                  let evd', rhs'' = pose_all_metas_as_evars curenv evd rhs' in
+                  let env' = pop_rel_context nb curenv in
+                  let evd', rhs'' = pose_all_metas_as_evars env' evd rhs' in
                   try solve_simple_evar_eqn eflags curenv evd' ev rhs''
                     with Retyping.RetypeError _ ->
                       error_cannot_unify curenv evd' (mkEvar ev,rhs'')

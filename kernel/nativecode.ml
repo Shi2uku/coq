@@ -65,11 +65,11 @@ type gname =
 let eq_gname gn1 gn2 =
   match gn1, gn2 with
   | Gind (s1, ind1), Gind (s2, ind2) ->
-     String.equal s1 s2 && eq_ind ind1 ind2
+     String.equal s1 s2 && Ind.CanOrd.equal ind1 ind2
   | Gconstant (s1, c1), Gconstant (s2, c2) ->
-      String.equal s1 s2 && Constant.equal c1 c2
+      String.equal s1 s2 && Constant.CanOrd.equal c1 c2
   | Gproj (s1, ind1, i1), Gproj (s2, ind2, i2) ->
-    String.equal s1 s2 && eq_ind ind1 ind2 && Int.equal i1 i2
+    String.equal s1 s2 && Ind.CanOrd.equal ind1 ind2 && Int.equal i1 i2
   | Gcase (None, i1), Gcase (None, i2) -> Int.equal i1 i2
   | Gcase (Some l1, i1), Gcase (Some l2, i2) -> Int.equal i1 i2 && Label.equal l1 l2
   | Gpred (None, i1), Gpred (None, i2) -> Int.equal i1 i2
@@ -96,9 +96,9 @@ open Hashset.Combine
 
 let gname_hash gn = match gn with
 | Gind (s, ind) ->
-   combinesmall 1 (combine (String.hash s) (ind_hash ind))
+   combinesmall 1 (combine (String.hash s) (Ind.CanOrd.hash ind))
 | Gconstant (s, c) ->
-   combinesmall 2 (combine (String.hash s) (Constant.hash c))
+   combinesmall 2 (combine (String.hash s) (Constant.CanOrd.hash c))
 | Gcase (l, i) -> combinesmall 3 (combine (Option.hash Label.hash l) (Int.hash i))
 | Gpred (l, i) -> combinesmall 4 (combine (Option.hash Label.hash l) (Int.hash i))
 | Gfixtype (l, i) -> combinesmall 5 (combine (Option.hash Label.hash l) (Int.hash i))
@@ -107,7 +107,7 @@ let gname_hash gn = match gn with
 | Ginternal s -> combinesmall 8 (String.hash s)
 | Grel i -> combinesmall 9 (Int.hash i)
 | Gnamed id -> combinesmall 10 (Id.hash id)
-| Gproj (s, p, i) -> combinesmall 11 (combine (String.hash s) (combine (ind_hash p) i))
+| Gproj (s, p, i) -> combinesmall 11 (combine (String.hash s) (combine (Ind.CanOrd.hash p) i))
 
 let case_ctr = ref (-1)
 
@@ -148,13 +148,13 @@ let eq_symbol sy1 sy2 =
   | SymbValue v1, SymbValue v2 -> (=) v1 v2 (** FIXME: how is this even valid? *)
   | SymbSort s1, SymbSort s2 -> Sorts.equal s1 s2
   | SymbName n1, SymbName n2 -> Name.equal n1 n2
-  | SymbConst kn1, SymbConst kn2 -> Constant.equal kn1 kn2
+  | SymbConst kn1, SymbConst kn2 -> Constant.CanOrd.equal kn1 kn2
   | SymbMatch sw1, SymbMatch sw2 -> eq_annot_sw sw1 sw2
-  | SymbInd ind1, SymbInd ind2 -> eq_ind ind1 ind2
+  | SymbInd ind1, SymbInd ind2 -> Ind.CanOrd.equal ind1 ind2
   | SymbMeta m1, SymbMeta m2 -> Int.equal m1 m2
   | SymbEvar evk1, SymbEvar evk2 -> Evar.equal evk1 evk2
   | SymbLevel l1, SymbLevel l2 -> Univ.Level.equal l1 l2
-  | SymbProj (i1, k1), SymbProj (i2, k2) -> eq_ind i1 i2 && Int.equal k1 k2
+  | SymbProj (i1, k1), SymbProj (i2, k2) -> Ind.CanOrd.equal i1 i2 && Int.equal k1 k2
   | _, _ -> false
 
 let hash_symbol symb =
@@ -162,13 +162,13 @@ let hash_symbol symb =
   | SymbValue v -> combinesmall 1 (Hashtbl.hash v) (** FIXME *)
   | SymbSort s -> combinesmall 2 (Sorts.hash s)
   | SymbName name -> combinesmall 3 (Name.hash name)
-  | SymbConst c -> combinesmall 4 (Constant.hash c)
+  | SymbConst c -> combinesmall 4 (Constant.CanOrd.hash c)
   | SymbMatch sw -> combinesmall 5 (hash_annot_sw sw)
-  | SymbInd ind -> combinesmall 6 (ind_hash ind)
+  | SymbInd ind -> combinesmall 6 (Ind.CanOrd.hash ind)
   | SymbMeta m -> combinesmall 7 m
   | SymbEvar evk -> combinesmall 8 (Evar.hash evk)
   | SymbLevel l -> combinesmall 9 (Univ.Level.hash l)
-  | SymbProj (i, k) -> combinesmall 10 (combine (ind_hash i) k)
+  | SymbProj (i, k) -> combinesmall 10 (combine (Ind.CanOrd.hash i) k)
 
 module HashedTypeSymbol = struct
   type t = symbol
@@ -438,7 +438,7 @@ let rec eq_mllambda gn1 gn2 n env1 env2 t1 t2 =
       eq_mllam_branches gn1 gn2 n env1 env2 br1 br2
   | MLconstruct (pf1, ind1, tag1, args1), MLconstruct (pf2, ind2, tag2, args2) ->
       String.equal pf1 pf2 &&
-      eq_ind ind1 ind2 &&
+      Ind.CanOrd.equal ind1 ind2 &&
       Int.equal tag1 tag2 &&
       Array.equal (eq_mllambda gn1 gn2 n env1 env2) args1 args2
   | MLint i1, MLint i2 ->
@@ -457,7 +457,7 @@ let rec eq_mllambda gn1 gn2 n env1 env2 t1 t2 =
       Array.equal (eq_mllambda gn1 gn2 n env1 env2) arr1 arr2
 
   | MLisaccu (s1, ind1, ml1), MLisaccu (s2, ind2, ml2) ->
-    String.equal s1 s2 && eq_ind ind1 ind2 &&
+    String.equal s1 s2 && Ind.CanOrd.equal ind1 ind2 &&
     eq_mllambda gn1 gn2 n env1 env2 ml1 ml2
   | (MLlocal _ | MLglobal _ | MLprimitive _ | MLlam _ | MLletrec _ | MLlet _ |
     MLapp _ | MLif _ | MLmatch _ | MLconstruct _ | MLint _ | MLuint _ |
@@ -527,7 +527,7 @@ let rec hash_mllambda gn n env t =
       combinesmall 9 (hash_mllam_branches gn n env (combine3 hannot hc haccu) br)
   | MLconstruct (pf, ind, tag, args) ->
       let hpf = String.hash pf in
-      let hcs = ind_hash ind in
+      let hcs = Ind.CanOrd.hash ind in
       let htag = Int.hash tag in
       combinesmall 10 (hash_mllambda_array gn n env (combine3 hpf hcs htag) args)
   | MLint i ->
@@ -545,7 +545,7 @@ let rec hash_mllambda gn n env t =
   | MLarray arr ->
       combinesmall 15 (hash_mllambda_array gn n env 1 arr)
   | MLisaccu (s, ind, c) ->
-      combinesmall 16 (combine (String.hash s) (combine (ind_hash ind) (hash_mllambda gn n env c)))
+      combinesmall 16 (combine (String.hash s) (combine (Ind.CanOrd.hash ind) (hash_mllambda gn n env c)))
   | MLfloat f ->
       combinesmall 17 (Float64.hash f)
 
@@ -689,7 +689,7 @@ let eq_global g1 g2 =
       eq_mllambda gn1 gn2 (Array.length lns1) env1 env2 t1 t2
   | Gopen s1, Gopen s2 -> String.equal s1 s2
   | Gtype (ind1, arr1), Gtype (ind2, arr2) ->
-    eq_ind ind1 ind2 &&
+    Ind.CanOrd.equal ind1 ind2 &&
     Array.equal (fun (tag1,ar1) (tag2,ar2) -> Int.equal tag1 tag2 && Int.equal ar1 ar2) arr1 arr2
   | Gcomment s1, Gcomment s2 -> String.equal s1 s2
   | _, _ -> false
@@ -720,7 +720,7 @@ let hash_global g =
     let hash_aux acc (tag,ar) =
       combine3 acc (Int.hash tag) (Int.hash ar)
     in
-    combinesmall 6 (combine (ind_hash ind) (Array.fold_left hash_aux 0 arr))
+    combinesmall 6 (combine (Ind.CanOrd.hash ind) (Array.fold_left hash_aux 0 arr))
   | Gcomment s -> combinesmall 7 (String.hash s)
 
 let global_stack = ref ([] : global list)
@@ -1933,7 +1933,7 @@ and compile_named env sigma univ auxdefs id =
   | LocalAssum _ ->
       Glet(Gnamed id, MLprimitive (Mk_var id))::auxdefs
 
-let compile_constant env sigma prefix ~interactive con cb =
+let compile_constant env sigma con cb =
     let no_univs = 0 = Univ.AUContext.size (Declareops.constant_polymorphic_context cb) in
     begin match cb.const_body with
     | Def t ->
@@ -1942,10 +1942,6 @@ let compile_constant env sigma prefix ~interactive con cb =
       if !Flags.debug then Feedback.msg_debug (Pp.str "Generated lambda code");
       let is_lazy = is_lazy t in
       let code = if is_lazy then mk_lazy code else code in
-      let name =
-        if interactive then LinkedInteractive prefix
-        else Linked prefix
-      in
       let l = Constant.label con in
       let auxdefs,code =
         if no_univs then compile_with_fv env sigma None [] (Some l) code
@@ -1959,7 +1955,7 @@ let compile_constant env sigma prefix ~interactive con cb =
         optimize_stk (Glet(Gconstant ("", con),code)::auxdefs)
       in
       if !Flags.debug then Feedback.msg_debug (Pp.str "Optimized mllambda code");
-      code, name
+      code
     | _ ->
         let i = push_symbol (SymbConst con) in
         let args =
@@ -1969,9 +1965,7 @@ let compile_constant env sigma prefix ~interactive con cb =
         (*
         let t = mkMLlam [|univ|] (mkMLapp (MLprimitive Mk_const)
          *)
-        [Glet(Gconstant ("", con), mkMLapp (MLprimitive Mk_const) args)],
-          if interactive then LinkedInteractive prefix
-          else Linked prefix
+        [Glet(Gconstant ("", con), mkMLapp (MLprimitive Mk_const) args)]
     end
 
 module StringOrd = struct type t = string let compare = String.compare end
@@ -1984,12 +1978,9 @@ let is_loaded_native_file s = StringSet.mem s !loaded_native_files
 let register_native_file s =
   loaded_native_files := StringSet.add s !loaded_native_files
 
-let is_code_loaded ~interactive name =
+let is_code_loaded name =
   match !name with
   | NotLinked -> false
-  | LinkedInteractive s ->
-      if (interactive && is_loaded_native_file s) then true
-      else (name := NotLinked; false)
   | Linked s ->
       if is_loaded_native_file s then true
       else (name := NotLinked; false)
@@ -2049,8 +2040,11 @@ let compile_mind mb mind stack =
   in
   Array.fold_left_i f stack mb.mind_packets
 
-type code_location_update =
-    link_info ref * link_info
+type code_location_update = {
+  upd_info : link_info ref;
+  upd_prefix : string;
+}
+
 type code_location_updates =
   code_location_update Mindmap_env.t * code_location_update Cmap_env.t
 
@@ -2058,35 +2052,34 @@ type linkable_code = global list * code_location_updates
 
 let empty_updates = Mindmap_env.empty, Cmap_env.empty
 
-let compile_mind_deps env prefix ~interactive
+let compile_mind_deps env prefix
     (comp_stack, (mind_updates, const_updates) as init) mind =
   let mib,nameref = lookup_mind_key mind env in
-  if is_code_loaded ~interactive nameref
+  if is_code_loaded nameref
     || Mindmap_env.mem mind mind_updates
   then init
   else
     let comp_stack =
       compile_mind mib mind comp_stack
     in
-    let name =
-      if interactive then LinkedInteractive prefix
-      else Linked prefix
-    in
-    let upd = (nameref, name) in
+    let upd = {
+      upd_info = nameref;
+      upd_prefix = prefix;
+    } in
     let mind_updates = Mindmap_env.add mind upd mind_updates in
     (comp_stack, (mind_updates, const_updates))
 
 (* This function compiles all necessary dependencies of t, and generates code in
    reverse order, as well as linking information updates *)
-let compile_deps env sigma prefix ~interactive init t =
+let compile_deps env sigma prefix init t =
   let rec aux env lvl init t =
   match kind t with
-  | Ind ((mind,_),_u) -> compile_mind_deps env prefix ~interactive init mind
+  | Ind ((mind,_),_u) -> compile_mind_deps env prefix init mind
   | Const c ->
     let c,_u = get_alias env c in
     let cb,(nameref,_) = lookup_constant_key c env in
     let (_, (_, const_updates)) = init in
-    if is_code_loaded ~interactive nameref
+    if is_code_loaded nameref
     || (Cmap_env.mem c const_updates)
     then init
     else
@@ -2096,19 +2089,21 @@ let compile_deps env sigma prefix ~interactive init t =
            aux env lvl init (Mod_subst.force_constr t)
         | _ -> init
       in
-      let code, name =
-        compile_constant env sigma prefix ~interactive c cb
-      in
+      let code = compile_constant env sigma c cb in
+      let upd = {
+        upd_info = nameref;
+        upd_prefix = prefix;
+      } in
       let comp_stack = code@comp_stack in
-      let const_updates = Cmap_env.add c (nameref, name) const_updates in
+      let const_updates = Cmap_env.add c upd const_updates in
       comp_stack, (mind_updates, const_updates)
-  | Construct (((mind,_),_),_u) -> compile_mind_deps env prefix ~interactive init mind
+  | Construct (((mind,_),_),_u) -> compile_mind_deps env prefix init mind
   | Proj (p,c) ->
-    let init = compile_mind_deps env prefix ~interactive init (Projection.mind p) in
+    let init = compile_mind_deps env prefix init (Projection.mind p) in
     aux env lvl init c
   | Case (ci, _p, _iv, _c, _ac) ->
       let mind = fst ci.ci_ind in
-      let init = compile_mind_deps env prefix ~interactive init mind in
+      let init = compile_mind_deps env prefix init mind in
       fold_constr_with_binders succ (aux env) lvl init t
   | Var id ->
     let open Context.Named.Declaration in
@@ -2130,11 +2125,8 @@ let compile_deps env sigma prefix ~interactive init t =
   in
   aux env 0 init t
 
-let compile_constant_field env prefix con acc cb =
-    let (gl, _) =
-      compile_constant ~interactive:false env empty_evars prefix
-        con cb
-    in
+let compile_constant_field env _prefix con acc cb =
+    let gl = compile_constant env empty_evars con cb in
     gl@acc
 
 let compile_mind_field mp l acc mb =
@@ -2152,11 +2144,11 @@ let mk_conv_code env sigma prefix t1 t2 =
   clear_global_tbl ();
   let gl, (mind_updates, const_updates) =
     let init = ([], empty_updates) in
-    compile_deps env sigma prefix ~interactive:true init t1
+    compile_deps env sigma prefix init t1
   in
   let gl, (mind_updates, const_updates) =
     let init = (gl, (mind_updates, const_updates)) in
-    compile_deps env sigma prefix ~interactive:true init t2
+    compile_deps env sigma prefix init t2
   in
   let code1 = lambda_of_constr env sigma t1 in
   let code2 = lambda_of_constr env sigma t2 in
@@ -2179,7 +2171,7 @@ let mk_norm_code env sigma prefix t =
   clear_global_tbl ();
   let gl, (mind_updates, const_updates) =
     let init = ([], empty_updates) in
-    compile_deps env sigma prefix ~interactive:true init t
+    compile_deps env sigma prefix init t
   in
   let code = lambda_of_constr env sigma t in
   let (gl,code) = compile_with_fv env sigma None gl None code in
@@ -2192,13 +2184,12 @@ let mk_norm_code env sigma prefix t =
       [|MLglobal (Ginternal "()")|])) in
   header::gl, (mind_updates, const_updates)
 
-let mk_library_header dir =
-  let libname = Format.sprintf "(str_decode \"%s\")" (str_encode dir) in
-  [Glet(Ginternal "symbols_tbl",
-    MLapp (MLglobal (Ginternal "get_library_native_symbols"),
-    [|MLglobal (Ginternal libname)|]))]
+let mk_library_header (symbols : Nativevalues.symbols) =
+  let symbols = Format.sprintf "(str_decode \"%s\")" (str_encode symbols) in
+  [Glet(Ginternal "symbols_tbl", MLglobal (Ginternal symbols))]
 
-let update_location (r,v) = r := v
+let update_location r =
+  r.upd_info := Linked r.upd_prefix
 
 let update_locations (ind_updates,const_updates) =
   Mindmap_env.iter (fun _ -> update_location) ind_updates;

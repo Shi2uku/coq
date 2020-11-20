@@ -15,8 +15,11 @@ open Libnames
 
 (** [constr_expr] is the abstract syntax tree produced by the parser *)
 type universe_decl_expr = (lident list, Glob_term.glob_constraint list) UState.gen_universe_decl
+type cumul_univ_decl_expr =
+  ((lident * Univ.Variance.t option) list, Glob_term.glob_constraint list) UState.gen_universe_decl
 
 type ident_decl = lident * universe_decl_expr option
+type cumul_ident_decl = lident * cumul_univ_decl_expr option
 type name_decl = lname * universe_decl_expr option
 
 type notation_with_optional_scope = LastLonelyNotation | NotationInScope of string
@@ -58,7 +61,7 @@ type abstraction_kind = AbsLambda | AbsPi
 type proj_flag = int option (** [Some n] = proj of the n-th visible argument *)
 
 type prim_token =
-  | Numeral of NumTok.Signed.t
+  | Number of NumTok.Signed.t
   | String of string
 
 type instance_expr = Glob_term.glob_level list
@@ -108,7 +111,7 @@ and constr_expr_r =
          * constr_expr * constr_expr
   | CHole   of Evar_kinds.t option * Namegen.intro_pattern_naming_expr * Genarg.raw_generic_argument option
   | CPatVar of Pattern.patvar
-  | CEvar   of Glob_term.existential_name * (Id.t * constr_expr) list
+  | CEvar   of Glob_term.existential_name CAst.t * (lident * constr_expr) list
   | CSort   of Glob_term.glob_sort
   | CCast   of constr_expr * constr_expr Glob_term.cast_type
   | CNotation of notation_with_optional_scope option * notation * constr_notation_substitution

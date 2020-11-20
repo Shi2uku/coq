@@ -69,7 +69,6 @@ let parray_get = set_global Vmvalues.parray_get
 let parray_get_default = set_global Vmvalues.parray_get_default
 let parray_set = set_global Vmvalues.parray_set
 let parray_copy = set_global Vmvalues.parray_copy
-let parray_reroot = set_global Vmvalues.parray_reroot
 let parray_length = set_global Vmvalues.parray_length
 
 (* table pour les structured_constant et les annotations des switchs *)
@@ -86,7 +85,7 @@ module AnnotTable = Hashtbl.Make (struct
   let hash = hash_annot_switch
 end)
 
-module ProjNameTable = Hashtbl.Make (Projection.Repr)
+module ProjNameTable = Hashtbl.Make (Projection.Repr.CanOrd)
 
 let str_cst_tbl : int SConstTable.t = SConstTable.create 31
 
@@ -135,7 +134,6 @@ let slot_for_caml_prim =
   | Arraydefault -> parray_get_default
   | Arrayset -> parray_set
   | Arraycopy -> parray_copy
-  | Arrayreroot -> parray_reroot
   | Arraylength -> parray_length
   | _ -> assert false
 
@@ -206,15 +204,11 @@ and eval_to_patch env (buff,pl,fv) =
   in
   let tc = patch buff pl slots in
   let vm_env =
-    (* Beware, this may look like a call to [Array.map], but it's not.
-       Calling [Array.map f] when the first argument returned by [f]
-       is a float would lead to [vm_env] being an unboxed Double_array
-       (Tag_val = Double_array_tag) whereas eval_tcode expects a
-       regular array (Tag_val = 0).
-       See test-suite/primitive/float/coq_env_double_array.v
-       for an actual instance. *)
-    let a = Array.make (Array.length fv) crazy_val in
-    Array.iteri (fun i v -> a.(i) <- slot_for_fv env v) fv; a in
+    (* Environment should look like a closure, so free variables start at slot 2. *)
+    let a = Array.make (Array.length fv + 2) crazy_val in
+    a.(1) <- Obj.magic 2;
+    Array.iteri (fun i v -> a.(i + 2) <- slot_for_fv env v) fv;
+    a in
   eval_tcode tc (get_atom_rel ()) (vm_global global_data.glob_val) vm_env
 
 and val_of_constr env c =

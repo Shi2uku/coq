@@ -268,16 +268,16 @@ let custom_entry_locality = Summary.ref ~name:"LOCAL-CUSTOM-ENTRY" String.Set.em
 let create_custom_entry ~local s =
   if List.mem s ["constr";"pattern";"ident";"global";"binder";"bigint"] then
     user_err Pp.(quote (str s) ++ str " is a reserved entry name.");
-  let sc = "constr:"^s in
-  let sp = "pattern:"^s in
+  let sc = "custom:"^s in
+  let sp = "custom_pattern:"^s in
   let _ = extend_entry_command constr_custom_entry sc in
   let _ = extend_entry_command pattern_custom_entry sp in
   let () = if local then custom_entry_locality := String.Set.add s !custom_entry_locality in
   ()
 
 let find_custom_entry s =
-  let sc = "constr:"^s in
-  let sp = "pattern:"^s in
+  let sc = "custom:"^s in
+  let sp = "custom_pattern:"^s in
   try (find_custom_entry constr_custom_entry sc, find_custom_entry pattern_custom_entry sp)
   with Not_found -> user_err Pp.(str "Undeclared custom entry: " ++ str s ++ str ".")
 
@@ -300,13 +300,13 @@ let interp_constr_entry_key : type r. _ -> r target -> int -> r Entry.t * int op
   match forpat with
   | ForConstr ->
     if level = 200 then Constr.binder_constr, None
-    else Constr.operconstr, Some level
+    else Constr.term, Some level
   | ForPattern -> Constr.pattern, Some level
 
 let target_entry : type s. notation_entry -> s target -> s Entry.t = function
 | InConstrEntry ->
    (function
-   | ForConstr -> Constr.operconstr
+   | ForConstr -> Constr.term
    | ForPattern -> Constr.pattern)
 | InCustomEntry s ->
    let (entry_for_constr, entry_for_patttern) = find_custom_entry s in
@@ -408,8 +408,8 @@ match e with
 | TTClosedBinderList _ -> { subst with binderlists = List.flatten v :: subst.binderlists }
 | TTBigint ->
   begin match forpat with
-  | ForConstr ->  push_constr subst (CAst.make @@ CPrim (Numeral (NumTok.Signed.of_int_string v)))
-  | ForPattern -> push_constr subst (CAst.make @@ CPatPrim (Numeral (NumTok.Signed.of_int_string v)))
+  | ForConstr ->  push_constr subst (CAst.make @@ CPrim (Number (NumTok.Signed.of_int_string v)))
+  | ForPattern -> push_constr subst (CAst.make @@ CPatPrim (Number (NumTok.Signed.of_int_string v)))
   end
 | TTReference ->
   begin match forpat with

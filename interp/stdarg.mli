@@ -23,6 +23,8 @@ val wit_unit : unit uniform_genarg_type
 
 val wit_bool : bool uniform_genarg_type
 
+val wit_nat : int uniform_genarg_type
+
 val wit_int : int uniform_genarg_type
 
 val wit_string : string uniform_genarg_type
@@ -35,7 +37,10 @@ val wit_int_or_var : (int or_var, int or_var, int) genarg_type
 
 val wit_ident : Id.t uniform_genarg_type
 
+val wit_hyp : (lident, lident, Id.t) genarg_type
+
 val wit_var : (lident, lident, Id.t) genarg_type
+[@@ocaml.deprecated "Use Stdarg.wit_hyp"]
 
 val wit_ref : (qualid, GlobRef.t located or_var, GlobRef.t) genarg_type
 
@@ -54,6 +59,7 @@ val wit_clause_dft_concl :  (lident Locus.clause_expr, lident Locus.clause_expr,
 
 (** Aliases for compatibility *)
 
+val wit_natural : int uniform_genarg_type
 val wit_integer : int uniform_genarg_type
 val wit_preident : string uniform_genarg_type
 val wit_reference : (qualid, GlobRef.t located or_var, GlobRef.t) genarg_type

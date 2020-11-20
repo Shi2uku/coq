@@ -9,7 +9,7 @@ beside proof development, tactics writing or documentation.
 
 
 Using Coq as a library
-----------------------
+------------------------
 
 In previous versions, ``coqmktop`` was used to build custom
 toplevels - for example for better debugging or custom static
@@ -34,7 +34,7 @@ For example, to statically link |Ltac|, you can just do:
 
 and similarly for other plugins.
 
-Building a |Coq| project
+Building a Coq project
 ------------------------
 
 As of today it is possible to build Coq projects using two tools:
@@ -44,11 +44,11 @@ As of today it is possible to build Coq projects using two tools:
 
 .. _coq_makefile:
 
-Building a |Coq| project with coq_makefile
+Building a Coq project with coq_makefile
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The majority of |Coq| projects are very similar: a collection of ``.v``
-files and eventually some ``.ml`` ones (a |Coq| plugin). The main piece of
+The majority of Coq projects are very similar: a collection of ``.v``
+files and eventually some ``.ml`` ones (a Coq plugin). The main piece of
 metadata needed in order to build the project are the command line
 options to ``coqc`` (e.g. ``-R``, ``Q``, ``-I``, see :ref:`command
 line options <command-line-options>`). Collecting the list of files
@@ -74,11 +74,11 @@ to literally pass an argument ``foo`` to ``coqc``: in the
 example, this allows to pass the two-word option ``-w all`` (see
 :ref:`command line options <command-line-options>`).
 
-|CoqIDE|, Proof-General and VSCoq all
-understand ``_CoqProject`` files and can be used to invoke |Coq| with the desired options.
+CoqIDE, Proof-General and VSCoq all
+understand ``_CoqProject`` files and can be used to invoke Coq with the desired options.
 
 The ``coq_makefile`` utility can be used to set up a build infrastructure
-for the |Coq| project based on makefiles. The recommended way of
+for the Coq project based on makefiles. The recommended way of
 invoking ``coq_makefile`` is the following one:
 
 ::
@@ -91,15 +91,55 @@ Such command generates the following files:
 CoqMakefile
   is a makefile for ``GNU Make`` with targets to build the project
   (e.g. generate .vo or .html files from .v or compile .ml* files)
-  and install it in the ``user-contrib`` directory where the |Coq|
-  library is installed. Run ``make`` with the ``-f CoqMakefile``
-  option to use ``CoqMakefile``.
+  and install it in the ``user-contrib`` directory where the Coq
+  library is installed.
 
 CoqMakefile.conf
   contains make variables assignments that reflect
   the contents of the ``_CoqProject`` file as well as the path relevant to
-  |Coq|.
+  Coq.
 
+The recommended approach is to invoke ``CoqMakefile`` from a standard
+``Makefile`` of the following form:
+
+.. example::
+
+  ::
+
+      # KNOWNTARGETS will not be passed along to CoqMakefile
+      KNOWNTARGETS := CoqMakefile extra-stuff extra-stuff2
+      # KNOWNFILES will not get implicit targets from the final rule, and so
+      # depending on them won't invoke the submake
+      # Warning: These files get declared as PHONY, so any targets depending
+      # on them always get rebuilt
+      KNOWNFILES   := Makefile _CoqProject
+
+      .DEFAULT_GOAL := invoke-coqmakefile
+
+      CoqMakefile: Makefile _CoqProject
+              $(COQBIN)coq_makefile -f _CoqProject -o CoqMakefile
+
+      invoke-coqmakefile: CoqMakefile
+              $(MAKE) --no-print-directory -f CoqMakefile $(filter-out $(KNOWNTARGETS),$(MAKECMDGOALS))
+
+      .PHONY: invoke-coqmakefile $(KNOWNFILES)
+
+      ####################################################################
+      ##                      Your targets here                         ##
+      ####################################################################
+
+      # This should be the last rule, to handle any targets not declared above
+      %: invoke-coqmakefile
+              @true
+
+The advantage of a wrapper, compared to directly calling the generated
+``Makefile``, is that it
+provides a target independent of the version of Coq to regenerate a
+``Makefile`` specific to the current version of Coq. Additionally, the
+master ``Makefile`` can be extended with targets not specific to Coq.
+Including the generated makefile with an include directive is
+discouraged, since the contents of this file, including variable names and
+status of rules, may change in the future.
 
 An optional file ``CoqMakefile.local`` can be provided by the user in order to
 extend ``CoqMakefile``. In particular one can declare custom actions to be
@@ -111,11 +151,11 @@ The extensions of the files listed in ``_CoqProject`` is used in order to
 decide how to build them. In particular:
 
 
-+ |Coq| files must use the ``.v`` extension
-+ |OCaml| files must use the ``.ml`` or ``.mli`` extension
-+ |OCaml| files that require pre processing for syntax
++ Coq files must use the ``.v`` extension
++ OCaml files must use the ``.ml`` or ``.mli`` extension
++ OCaml files that require pre processing for syntax
   extensions (like ``VERNAC EXTEND``) must use the ``.mlg`` extension
-+ In order to generate a plugin one has to list all |OCaml|
++ In order to generate a plugin one has to list all OCaml
   modules (i.e. ``Baz`` for ``baz.ml``) in a ``.mlpack`` file (or ``.mllib``
   file).
 
@@ -145,7 +185,7 @@ Here we describe only few of them.
    passed to the OCaml compiler on building or linking of modules. Eg:
    ``-package yojson``.
 :CAMLFLAGS:
-   can be used to specify additional flags to the |OCaml|
+   can be used to specify additional flags to the OCaml
    compiler, like ``-bin-annot`` or ``-w``....
 :OCAMLWARN:
    it contains a default of ``-warn-error +a-3``, useful to modify
@@ -453,50 +493,6 @@ line timing data:
       This target requires python to build the table.
 
 
-Reusing/extending the generated Makefile
-++++++++++++++++++++++++++++++++++++++++
-
-Including the generated makefile with an include directive is
-discouraged. The contents of this file, including variable names and
-status of rules shall change in the future. Users are advised to
-include ``Makefile.conf`` or call a target of the generated Makefile as in
-``make -f Makefile target`` from another Makefile.
-
-One way to get access to all targets of the generated ``CoqMakefile`` is to
-have a generic target for invoking unknown targets.
-
-.. example::
-
-  ::
-
-      # KNOWNTARGETS will not be passed along to CoqMakefile
-      KNOWNTARGETS := CoqMakefile extra-stuff extra-stuff2
-      # KNOWNFILES will not get implicit targets from the final rule, and so
-      # depending on them won't invoke the submake
-      # Warning: These files get declared as PHONY, so any targets depending
-      # on them always get rebuilt
-      KNOWNFILES   := Makefile _CoqProject
-
-      .DEFAULT_GOAL := invoke-coqmakefile
-
-      CoqMakefile: Makefile _CoqProject
-              $(COQBIN)coq_makefile -f _CoqProject -o CoqMakefile
-
-      invoke-coqmakefile: CoqMakefile
-              $(MAKE) --no-print-directory -f CoqMakefile $(filter-out $(KNOWNTARGETS),$(MAKECMDGOALS))
-
-      .PHONY: invoke-coqmakefile $(KNOWNFILES)
-
-      ####################################################################
-      ##                      Your targets here                         ##
-      ####################################################################
-
-      # This should be the last rule, to handle any targets not declared above
-      %: invoke-coqmakefile
-              @true
-
-
-
 Building a subset of the targets with ``-j``
 ++++++++++++++++++++++++++++++++++++++++++++
 
@@ -524,7 +520,7 @@ Precompiling for ``native_compute``
 +++++++++++++++++++++++++++++++++++
 
 To compile files for ``native_compute``, one can use the
-``-native-compiler yes`` option of |Coq|, for instance by putting the
+``-native-compiler yes`` option of Coq, for instance by putting the
 following in a :ref:`coqmakefilelocal` file:
 
 ::
@@ -555,7 +551,7 @@ of installing the extra ``.coq-native`` directories.
    This requires all dependencies to be themselves compiled with
    ``-native-compiler yes``.
 
-Building a |Coq| project with Dune
+Building a Coq project with Dune
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. note::
@@ -575,7 +571,7 @@ for your files. This involves adding a ``dune-project`` and
 ``pkg.opam`` file to the root (``pkg.opam`` can be empty or generated
 by Dune itself), and then providing ``dune`` files in the directories
 your ``.v`` files are placed. For the experimental version "0.1" of
-the Coq Dune language, |Coq| library stanzas look like:
+the Coq Dune language, Coq library stanzas look like:
 
 .. code:: scheme
 
@@ -642,14 +638,14 @@ Computing Module dependencies
 -----------------------------
 
 In order to compute module dependencies (to be used by ``make`` or
-``dune``), |Coq| provides the ``coqdep`` tool.
+``dune``), Coq provides the ``coqdep`` tool.
 
-``coqdep`` computes inter-module dependencies for |Coq|
+``coqdep`` computes inter-module dependencies for Coq
 programs, and prints the dependencies on the standard output in a
 format readable by make. When a directory is given as argument, it is
 recursively looked at.
 
-Dependencies of |Coq| modules are computed by looking at ``Require``
+Dependencies of Coq modules are computed by looking at ``Require``
 commands (``Require``, ``Require Export``, ``Require Import``), but also at the
 command ``Declare ML Module``.
 
@@ -659,20 +655,20 @@ Both Dune and ``coq_makefile`` use ``coqdep`` to compute the
 dependencies among the files part of a Coq project.
 
 Embedded Coq phrases inside |Latex| documents
----------------------------------------------
+-----------------------------------------------
 
 When writing documentation about a proof development, one may want
-to insert |Coq| phrases inside a |Latex| document, possibly together
+to insert Coq phrases inside a |Latex| document, possibly together
 with the corresponding answers of the system. We provide a mechanical
-way to process such |Coq| phrases embedded in |Latex| files: the ``coq-tex``
-filter. This filter extracts |Coq| phrases embedded in |Latex| files,
+way to process such Coq phrases embedded in |Latex| files: the ``coq-tex``
+filter. This filter extracts Coq phrases embedded in |Latex| files,
 evaluates them, and insert the outcome of the evaluation after each
 phrase.
 
-Starting with a file ``file.tex`` containing |Coq| phrases, the ``coq-tex``
+Starting with a file ``file.tex`` containing Coq phrases, the ``coq-tex``
 filter produces a file named ``file.v.tex`` with the Coq outcome.
 
-There are options to produce the |Coq| parts in smaller font, italic,
+There are options to produce the Coq parts in smaller font, italic,
 between horizontal rules, etc. See the man page of ``coq-tex`` for more
 details.
 

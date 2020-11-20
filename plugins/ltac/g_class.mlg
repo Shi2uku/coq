@@ -31,12 +31,12 @@ let set_transparency cl b =
 }
 
 VERNAC COMMAND EXTEND Typeclasses_Unfold_Settings CLASSIFIED AS SIDEFF
-| [ "Typeclasses" "Transparent" reference_list(cl) ] -> {
+| [ "Typeclasses" "Transparent" ne_reference_list(cl) ] -> {
     set_transparency cl true }
 END
 
 VERNAC COMMAND EXTEND Typeclasses_Rigid_Settings CLASSIFIED AS SIDEFF
-| [ "Typeclasses" "Opaque" reference_list(cl) ] -> {
+| [ "Typeclasses" "Opaque" ne_reference_list(cl) ] -> {
     set_transparency cl false }
 END
 
@@ -77,7 +77,7 @@ END
 (* true = All transparent, false = Opaque if possible *)
 
 VERNAC COMMAND EXTEND Typeclasses_Settings CLASSIFIED AS SIDEFF
- | [ "Typeclasses" "eauto" ":=" debug(d) eauto_search_strategy(s) int_opt(depth) ] -> {
+ | [ "Typeclasses" "eauto" ":=" debug(d) eauto_search_strategy(s) natural_opt(depth) ] -> {
      set_typeclasses_debug d;
      Option.iter set_typeclasses_strategy s;
      set_typeclasses_depth depth
@@ -87,11 +87,13 @@ END
 (** Compatibility: typeclasses eauto has 8.5 and 8.6 modes *)
 TACTIC EXTEND typeclasses_eauto
  | [ "typeclasses" "eauto" "bfs" int_or_var_opt(d) "with" ne_preident_list(l) ] ->
-    { typeclasses_eauto ~strategy:Bfs ~depth:d l }
+    { typeclasses_eauto ~depth:d ~strategy:Bfs l }
  | [ "typeclasses" "eauto" int_or_var_opt(d) "with" ne_preident_list(l) ] ->
     { typeclasses_eauto ~depth:d l }
+ | [ "typeclasses" "eauto" "bfs" int_or_var_opt(d) ] -> {
+     typeclasses_eauto ~depth:d ~strategy:Bfs ~only_classes:true [Class_tactics.typeclasses_db] }
  | [ "typeclasses" "eauto" int_or_var_opt(d) ] -> {
-     typeclasses_eauto ~only_classes:true ~depth:d [Class_tactics.typeclasses_db] }
+     typeclasses_eauto ~depth:d ~only_classes:true [Class_tactics.typeclasses_db] }
 END
 
 TACTIC EXTEND head_of_constr

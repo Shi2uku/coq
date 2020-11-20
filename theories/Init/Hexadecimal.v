@@ -12,7 +12,7 @@
 
 (** These numbers coded in base 16 will be used for parsing and printing
     other Coq numeral datatypes in an human-readable way.
-    See the [Numeral Notation] command.
+    See the [Number Notation] command.
     We represent numbers in base 16 as lists of hexadecimal digits,
     in big-endian order (most significant digit comes first). *)
 
@@ -125,6 +125,12 @@ Definition opp (d:int) :=
   | Neg d => Pos d
   end.
 
+Definition abs (d:int) : uint :=
+  match d with
+  | Pos d => d
+  | Neg d => d
+  end.
+
 (** For conversions with binary numbers, it is easier to operate
     on little-endian numbers. *)
 
@@ -171,6 +177,38 @@ Definition nztail_int d :=
   match d with
   | Pos d => let (r, n) := nztail d in pair (Pos r) n
   | Neg d => let (r, n) := nztail d in pair (Neg r) n
+  end.
+
+(** [del_head n d] removes [n] digits at beginning of [d]
+    or returns [zero] if [d] has less than [n] digits. *)
+
+Fixpoint del_head n d :=
+  match n with
+  | O => d
+  | S n =>
+    match d with
+    | Nil => zero
+    | D0 d | D1 d | D2 d | D3 d | D4 d | D5 d | D6 d | D7 d | D8 d | D9 d
+    | Da d | Db d | Dc d | Dd d | De d | Df d =>
+      del_head n d
+    end
+  end.
+
+Definition del_head_int n d :=
+  match d with
+  | Pos d => del_head n d
+  | Neg d => del_head n d
+  end.
+
+(** [del_tail n d] removes [n] digits at end of [d]
+    or returns [zero] if [d] has less than [n] digits. *)
+
+Definition del_tail n d := rev (del_head n (rev d)).
+
+Definition del_tail_int n d :=
+  match d with
+  | Pos d => Pos (del_tail n d)
+  | Neg d => Neg (del_tail n d)
   end.
 
 Module Little.

@@ -153,12 +153,18 @@ type evar_map
 val empty : evar_map
 (** The empty evar map. *)
 
-val from_env : env -> evar_map
+val from_env : ?binders:lident list -> env -> evar_map
 (** The empty evar map with given universe context, taking its initial
-    universes from env. *)
+    universes from env, possibly with initial universe binders. This
+    is the main entry point at the beginning of the process of
+    interpreting a declaration (e.g. before entering the
+    interpretation of a Theorem statement). *)
 
 val from_ctx : UState.t -> evar_map
-(** The empty evar map with given universe context *)
+(** The empty evar map with given universe context. This is the main
+    entry point when resuming from a already interpreted declaration
+    (e.g.  after having interpreted a Theorem statement and preparing
+    to open a goal). *)
 
 val is_empty : evar_map -> bool
 (** Whether an evarmap is empty. *)
@@ -284,8 +290,11 @@ val restrict : Evar.t-> Filter.t -> ?candidates:econstr list ->
     possibly limiting the instances to a set of candidates (candidates
     are filtered according to the filter) *)
 
-val is_restricted_evar : evar_map -> Evar.t -> Evar.t option
-(** Tell if an evar comes from restriction of another evar, and if yes, which *)
+val get_aliased_evars : evar_map -> Evar.t Evar.Map.t
+(** The map of aliased evars *)
+
+val is_aliased_evar : evar_map -> Evar.t -> Evar.t option
+(** Tell if an evar has been aliased to another evar, and if yes, which *)
 
 val set_typeclass_evars : evar_map -> Evar.Set.t -> evar_map
 (** Mark the given set of evars as available for resolution.
@@ -387,7 +396,6 @@ val push_future_goals : evar_map -> evar_map
 val pop_future_goals : evar_map -> FutureGoals.t * evar_map
 
 val fold_future_goals : (evar_map -> Evar.t -> evar_map) -> evar_map -> evar_map
-
 
 val remove_future_goal : evar_map -> Evar.t -> evar_map
 

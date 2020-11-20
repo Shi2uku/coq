@@ -36,7 +36,8 @@ include ../Makefile.common
 # Note that this will later need an eval in shell to interpret the quotes
 ROOT='$(shell cd ..; pwd)'
 
-ifneq ($(wildcard ../_build),)
+ifneq ($(wildcard ../_build/default/config/Makefile),)
+include ../_build/default/config/Makefile
 BIN:=$(ROOT)/_build/install/default/bin/
 # COQLIB is an env variable so no quotes
 COQLIB:=$(shell cd ..; pwd)/_build/install/default/lib/coq
@@ -141,7 +142,7 @@ run: $(SUBSYSTEMS)
 bugs: $(BUGS)
 
 clean:
-	rm -f trace .nia.cache .lia.cache output/MExtraction.out
+	rm -f trace .csdp.cache .nia.cache .lia.cache output/MExtraction.out
 	rm -f vos/Makefile vos/Makefile.conf
 	$(SHOW) 'RM        <**/*.stamp> <**/*.vo> <**/*.vio> <**/*.log> <**/*.glob>'
 	$(HIDE)find . \( \

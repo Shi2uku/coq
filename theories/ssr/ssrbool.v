@@ -487,6 +487,7 @@ Ltac prop_congr := apply: prop_congr.
 Lemma is_true_true : true.               Proof. by []. Qed.
 Lemma not_false_is_true : ~ false.       Proof. by []. Qed.
 Lemma is_true_locked_true : locked true. Proof. by unlock. Qed.
+#[global]
 Hint Resolve is_true_true not_false_is_true is_true_locked_true : core.
 
 (**  Shorter names.  **)
@@ -1401,8 +1402,8 @@ Definition mem T (pT : predType T) : pT -> mem_pred T :=
   let: PredType toP := pT in fun A => Mem [eta toP A].
 Arguments mem {T pT} A : rename, simpl never.
 
-Notation "x \in A" := (in_mem x (mem A)) : bool_scope.
-Notation "x \in A" := (in_mem x (mem A)) : bool_scope.
+Notation "x \in A" := (in_mem x (mem A)) (only parsing) : bool_scope.
+Notation "x \in A" := (in_mem x (mem A)) (only printing) : bool_scope.
 Notation "x \notin A" := (~~ (x \in A)) : bool_scope.
 Notation "A =i B" := (eq_mem (mem A) (mem B)) : type_scope.
 Notation "{ 'subset' A <= B }" := (sub_mem (mem A) (mem B)) : type_scope.
@@ -1573,9 +1574,12 @@ Arguments has_quality n {T}.
 
 Lemma qualifE n T p x : (x \in @Qualifier n T p) = p x. Proof. by []. Qed.
 
-Notation "x \is A" := (x \in has_quality 0 A) : bool_scope.
-Notation "x \is 'a' A" := (x \in has_quality 1 A) : bool_scope.
-Notation "x \is 'an' A" := (x \in has_quality 2 A) : bool_scope.
+Notation "x \is A" := (x \in has_quality 0 A) (only parsing) : bool_scope.
+Notation "x \is A" := (x \in has_quality 0 A) (only printing) : bool_scope.
+Notation "x \is 'a' A" := (x \in has_quality 1 A) (only parsing) : bool_scope.
+Notation "x \is 'a' A" := (x \in has_quality 1 A) (only printing) : bool_scope.
+Notation "x \is 'an' A" := (x \in has_quality 2 A) (only parsing) : bool_scope.
+Notation "x \is 'an' A" := (x \in has_quality 2 A) (only printing) : bool_scope.
 Notation "x \isn't A" := (x \notin has_quality 0 A) : bool_scope.
 Notation "x \isn't 'a' A" := (x \notin has_quality 1 A) : bool_scope.
 Notation "x \isn't 'an' A" := (x \notin has_quality 2 A) : bool_scope.

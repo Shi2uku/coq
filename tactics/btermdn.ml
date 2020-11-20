@@ -27,7 +27,7 @@ type term_label =
 | SortLabel
 
 let compare_term_label t1 t2 = match t1, t2 with
-| GRLabel gr1, GRLabel gr2 -> GlobRef.Ordered.compare gr1 gr2
+| GRLabel gr1, GRLabel gr2 -> GlobRef.CanOrd.compare gr1 gr2
 | _ -> pervasives_compare t1 t2 (** OK *)
 
 type 'res lookup_res = 'res Dn.lookup_res = Label of 'res | Nothing | Everything
@@ -185,8 +185,6 @@ struct
     | Some st ->
         (fun dn t ->
              Dn.lookup dn (bounded_constr_val_discr_st env sigma st) (t,!dnet_depth))
-
-  let app f dn = Dn.app f dn
 
 end
 

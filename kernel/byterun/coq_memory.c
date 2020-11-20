@@ -65,9 +65,10 @@ static void coq_scan_roots(scanning_action action)
   register value * i;
   /* Scan the stack */
   for (i = coq_sp; i < coq_stack_high; i++) {
+    if (!Is_block(*i)) continue;
 #ifdef NO_NAKED_POINTERS
     /* The VM stack may contain C-allocated bytecode */
-    if (Is_block(*i) && !Is_in_heap_or_young(*i)) continue;
+    if (!Is_in_heap_or_young(*i)) continue;
 #endif
     (*action) (*i, i);
   };
@@ -108,7 +109,7 @@ value init_coq_vm(value unit) /* ML */
     init_coq_interpreter();
 
     /* Some predefined pointer code.
-     * It is typically contained in accumulator blocks whose tag is 0 and thus
+     * It is typically contained in accumulator blocks and thus might be
      * scanned by the GC, so make it look like an OCaml block. */
     value accu_block = (value) coq_stat_alloc(2 * sizeof(value));
     Hd_hp (accu_block) = Make_header (1, Abstract_tag, Caml_black);        \

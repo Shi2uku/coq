@@ -695,6 +695,8 @@ module New = struct
   (* Check that holes in arguments have been resolved *)
 
   let check_evars env sigma extsigma origsigma =
+    let reachable = lazy (Evarutil.reachable_from_evars sigma
+                            (Evar.Map.domain (Evd.undefined_map origsigma))) in
     let rec is_undefined_up_to_restriction sigma evk =
       if Evd.mem origsigma evk then None else
       let evi = Evd.find sigma evk in
@@ -710,7 +712,12 @@ module New = struct
     let rest =
       Evd.fold_undefined (fun evk evi acc ->
         match is_undefined_up_to_restriction sigma evk with
-        | Some (evk',evi) -> (evk',evi)::acc
+        | Some (evk',evi) ->
+           (* If [evk'] descends from [evk] which descends itself from
+              an originally undefined evar in [origsigma], it is a not
+              a fresh undefined hole from [sigma]. *)
+           if Evar.Set.mem evk (Lazy.force reachable) then acc
+           else (evk',evi)::acc
         | _ -> acc)
         extsigma []
     in
@@ -790,6 +797,9 @@ module New = struct
     end
   let onLastDecl  = onNthDecl 1
 
+  let nLastHypsId gl n = List.map (NamedDecl.get_id) (nLastDecls gl n)
+  let nLastHyps gl n = List.map mkVar (nLastHypsId gl n)
+
   let ifOnHyp pred tac1 tac2 id =
     Proofview.Goal.enter begin fun gl ->
     let typ = Tacmach.New.pf_get_hyp_typ id gl in
@@ -800,6 +810,10 @@ module New = struct
     end
 
   let onHyps find tac = Proofview.Goal.enter begin fun gl -> tac (find gl) end
+
+  let onNLastDecls n tac  = onHyps (fun gl -> nLastDecls gl n) tac
+  let onNLastHypsId n tac = onHyps (fun gl -> nLastHypsId gl n) tac
+  let onNLastHyps n tac   = onHyps (fun gl -> nLastHyps gl n) tac
 
   let afterHyp id tac =
     Proofview.Goal.enter begin fun gl ->
@@ -828,6 +842,16 @@ module New = struct
     tclMAP tac (Locusops.simple_clause_of (fun () -> hyps) cl)
     end
 
+  let fullGoal gl = None :: List.map Option.make (Tacmach.New.pf_ids_of_hyps gl)
+  let onAllHyps tac =
+    Proofview.Goal.enter begin fun gl ->
+      tclMAP tac (Tacmach.New.pf_ids_of_hyps gl)
+      end
+  let onAllHypsAndConcl tac =
+    Proofview.Goal.enter begin fun gl ->
+      tclMAP tac (fullGoal gl)
+      end
+
   let elimination_sort_of_goal gl =
     (* Retyping will expand evars anyway. *)
     let c = Proofview.Goal.concl gl in
@@ -847,5 +871,12 @@ module New = struct
     Proofview.tclENV >>= fun env ->
     let (sigma, c) = Evd.fresh_global env sigma ref in
     Proofview.Unsafe.tclEVARS sigma <*> Proofview.tclUNIT c
+
+  let tclTYPEOFTHEN ?refresh c tac =
+    Proofview.Goal.enter (fun gl ->
+      let env = Proofview.Goal.env gl in
+      let sigma = Proofview.Goal.sigma gl in
+      let (sigma, t) = Typing.type_of ?refresh env sigma c in
+      Proofview.Unsafe.tclEVARS sigma <*> tac sigma t)
 
 end

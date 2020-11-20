@@ -8,13 +8,14 @@ Inductive types
 
 .. cmd:: Inductive @inductive_definition {* with @inductive_definition }
 
-   .. insertprodn inductive_definition constructor
+   .. insertprodn inductive_definition cumul_ident_decl
 
    .. prodn::
-      inductive_definition ::= {? > } @ident_decl {* @binder } {? %| {* @binder } } {? : @type } {? := {? @constructors_or_record } } {? @decl_notations }
+      inductive_definition ::= {? > } @cumul_ident_decl {* @binder } {? %| {* @binder } } {? : @type } {? := {? @constructors_or_record } } {? @decl_notations }
       constructors_or_record ::= {? %| } {+| @constructor }
-      | {? @ident } %{ {*; @record_field } %}
+      | {? @ident } %{ {*; @record_field } {? ; } %}
       constructor ::= @ident {* @binder } {? @of_type }
+      cumul_ident_decl ::= @ident {? @cumul_univ_decl }
 
    This command defines one or more
    inductive types and its constructors.  Coq generates destructors
@@ -31,10 +32,8 @@ Inductive types
    proposition).
 
    This command supports the :attr:`universes(polymorphic)`,
-   :attr:`universes(monomorphic)`, :attr:`universes(template)`,
-   :attr:`universes(notemplate)`, :attr:`universes(cumulative)`,
-   :attr:`universes(noncumulative)` and :attr:`private(matching)`
-   attributes.
+   :attr:`universes(template)`, :attr:`universes(cumulative)`, and
+   :attr:`private(matching)` attributes.
 
    Mutually inductive types can be defined by including multiple :n:`@inductive_definition`\s.
    The :n:`@ident`\s are simultaneously added to the environment before the types of constructors are checked.
@@ -342,9 +341,9 @@ Recursive functions: fix
 .. insertprodn term_fix fixannot
 
 .. prodn::
-   term_fix ::= let fix @fix_body in @term
-   | fix @fix_body {? {+ with @fix_body } for @ident }
-   fix_body ::= @ident {* @binder } {? @fixannot } {? : @type } := @term
+   term_fix ::= let fix @fix_decl in @term
+   | fix @fix_decl {? {+ with @fix_decl } for @ident }
+   fix_decl ::= @ident {* @binder } {? @fixannot } {? : @type } := @term
    fixannot ::= %{ struct @ident %}
    | %{ wf @one_term @ident %}
    | %{ measure @one_term {? @ident } {? @one_term } %}
@@ -361,7 +360,11 @@ syntax: :n:`let fix @ident {* @binder } := @term in` stands for
 
 Some options of :n:`@fixannot` are only supported in specific constructs.  :n:`fix` and :n:`let fix`
 only support the :n:`struct` option, while :n:`wf` and :n:`measure` are only supported in
-commands such as :cmd:`Function` and :cmd:`Program Fixpoint`.
+commands such as :cmd:`Fixpoint` (with the :attr:`program` attribute) and :cmd:`Function`.
+
+.. todo explanation of struct: see text above at the Fixpoint command, also
+   see https://github.com/coq/coq/pull/12936#discussion_r510716268 and above.
+   Consider whether to move the grammar for fixannot elsewhere
 
 .. _Fixpoint:
 
@@ -379,7 +382,7 @@ constructions.
    .. prodn::
       fix_definition ::= @ident_decl {* @binder } {? @fixannot } {? : @type } {? := @term } {? @decl_notations }
 
-   This command allows defining functions by pattern matching over inductive
+   Allows defining functions by pattern matching over inductive
    objects using a fixed point construction. The meaning of this declaration is
    to define :n:`@ident` as a recursive function with arguments specified by
    the :n:`@binder`\s such that :n:`@ident` applied to arguments
@@ -387,6 +390,8 @@ constructions.
    equivalent to the expression :n:`@term`. The type of :n:`@ident` is
    consequently :n:`forall {* @binder }, @type` and its value is equivalent
    to :n:`fun {* @binder } => @term`.
+
+   This command accepts the :attr:`program` attribute.
 
    To be accepted, a :cmd:`Fixpoint` definition has to satisfy syntactical
    constraints on a special argument called the decreasing argument. They
@@ -399,7 +404,7 @@ constructions.
    that satisfies the decreasing condition.
 
    :cmd:`Fixpoint` without the :attr:`program` attribute does not support the
-   :n:`wf` or :n:`measure` clauses of :n:`@fixannot`.
+   :n:`wf` or :n:`measure` clauses of :n:`@fixannot`. See :ref:`program_fixpoint`.
 
    The :n:`with` clause allows simultaneously defining several mutual fixpoints.
    It is especially useful when defining functions over mutually defined
@@ -409,6 +414,8 @@ constructions.
    This can be used to define a term incrementally, in particular by relying on the :tacn:`refine` tactic.
    In this case, the proof should be terminated with :cmd:`Defined` in order to define a constant
    for which the computational behavior is relevant.  See :ref:`proof-editing-mode`.
+
+   This command accepts the :attr:`using` attribute.
 
    .. note::
 
@@ -544,7 +551,7 @@ the sort of the inductive type :math:`t` (not to be confused with :math:`\Sort` 
       \end{array}
       \right]}
 
-   which corresponds to the result of the |Coq| declaration:
+   which corresponds to the result of the Coq declaration:
 
    .. coqtop:: in reset
 
@@ -565,7 +572,7 @@ the sort of the inductive type :math:`t` (not to be confused with :math:`\Sort` 
                 \consf &:& \tree → \forest → \forest\\
                           \end{array}\right]}
 
-   which corresponds to the result of the |Coq| declaration:
+   which corresponds to the result of the Coq declaration:
 
    .. coqtop:: in
 
@@ -588,7 +595,7 @@ the sort of the inductive type :math:`t` (not to be confused with :math:`\Sort` 
                 \oddS &:& ∀ n,~\even~n → \odd~(\nS~n)
                           \end{array}\right]}
 
-   which corresponds to the result of the |Coq| declaration:
+   which corresponds to the result of the Coq declaration:
 
    .. coqtop:: in
 
@@ -1049,7 +1056,7 @@ Conversion is preserved as any (partial) instance :math:`I_j~q_1 … q_r` or
    at level :math:`\Type` (without annotations or hiding it behind a
    definition) template polymorphic if possible.
 
-   This can be prevented using the :attr:`universes(notemplate)`
+   This can be prevented using the :attr:`universes(template=no) <universes(template)>`
    attribute.
 
    Template polymorphism and full universe polymorphism (see Chapter
@@ -1068,11 +1075,12 @@ Conversion is preserved as any (partial) instance :math:`I_j~q_1 … q_r` or
    the :attr:`universes(template)` attribute: in this case, the
    warning is not emitted.
 
-.. attr:: universes(template)
+.. attr:: universes(template{? = {| yes | no } })
+   :name: universes(template)
 
-   This attribute can be used to explicitly declare an inductive type
-   as template polymorphic, whether the :flag:`Auto Template
-   Polymorphism` flag is on or off.
+   This :term:`boolean attribute` can be used to explicitly declare an
+   inductive type as template polymorphic, whether the :flag:`Auto
+   Template Polymorphism` flag is on or off.
 
    .. exn:: template and polymorphism not compatible
 
@@ -1085,13 +1093,17 @@ Conversion is preserved as any (partial) instance :math:`I_j~q_1 … q_r` or
       The attribute was used but the inductive definition does not
       satisfy the criterion to be template polymorphic.
 
+   When ``universes(template=no)`` is used, it will prevent an
+   inductive type to be template polymorphic, even if the :flag:`Auto
+   Template Polymorphism` flag is on.
+
 .. attr:: universes(notemplate)
 
-   This attribute can be used to prevent an inductive type to be
-   template polymorphic, even if the :flag:`Auto Template
-   Polymorphism` flag is on.
+   .. deprecated:: 8.13
 
-In practice, the rule **Ind-Family** is used by |Coq| only when all the
+      Use :attr:`universes(template=no) <universes(template)>` instead.
+
+In practice, the rule **Ind-Family** is used by Coq only when all the
 inductive types of the inductive definition are declared with an arity
 whose sort is in the Type hierarchy. Then, the polymorphism is over
 the parameters whose type is an arity of sort in the Type hierarchy.
@@ -1229,7 +1241,7 @@ at the computational level it implements a generic operator for doing
 primitive recursion over the structure.
 
 But this operator is rather tedious to implement and use. We choose in
-this version of |Coq| to factorize the operator for primitive recursion
+this version of Coq to factorize the operator for primitive recursion
 into two more primitive operations as was first suggested by Th.
 Coquand in :cite:`Coq92`. One is the definition by pattern matching. The
 second one is a definition by guarded fixpoints.
@@ -1244,7 +1256,7 @@ The basic idea of this operator is that we have an object :math:`m` in an
 inductive type :math:`I` and we want to prove a property which possibly
 depends on :math:`m`. For this, it is enough to prove the property for
 :math:`m = (c_i~u_1 … u_{p_i} )` for each constructor of :math:`I`.
-The |Coq| term for this proof
+The Coq term for this proof
 will be written:
 
 .. math::
@@ -1259,7 +1271,7 @@ Actually, for type checking a :math:`\Match…\with…\kwend` expression we also
 to know the predicate :math:`P` to be proved by case analysis. In the general
 case where :math:`I` is an inductively defined :math:`n`-ary relation, :math:`P` is a predicate
 over :math:`n+1` arguments: the :math:`n` first ones correspond to the arguments of :math:`I`
-(parameters excluded), and the last one corresponds to object :math:`m`. |Coq|
+(parameters excluded), and the last one corresponds to object :math:`m`. Coq
 can sometimes infer this predicate but sometimes not. The concrete
 syntax for describing this predicate uses the :math:`\as…\In…\return`
 construction. For instance, let us assume that :math:`I` is an unary predicate

@@ -244,24 +244,20 @@ let check_conv_record env sigma (t1,sk1) (t2,sk2) =
         Prod (_,a,b) -> (* assert (l2=[]); *)
           let _, a, b = destProd sigma t2 in
           if noccurn sigma 1 b then
-            lookup_canonical_conversion (proji, Prod_cs),
+            lookup_canonical_conversion env (proji, Prod_cs),
             (Stack.append_app [|a;pop b|] Stack.empty)
           else raise Not_found
       | Sort s ->
         let s = ESorts.kind sigma s in
-        lookup_canonical_conversion
+        lookup_canonical_conversion env
           (proji, Sort_cs (Sorts.family s)),[]
       | Proj (p, c) ->
-        let c2 = GlobRef.ConstRef (Projection.constant p) in
-        let c = Retyping.expand_projection env sigma p c [] in
-        let _, args = destApp sigma c in
-        let sk2 = Stack.append_app args sk2 in
-        lookup_canonical_conversion (proji, Const_cs c2), sk2
+        lookup_canonical_conversion env (proji, Proj_cs (Projection.repr p)), Stack.append_app [|c|] sk2
       | _ ->
         let (c2, _) = try destRef sigma t2 with DestKO -> raise Not_found in
-          lookup_canonical_conversion (proji, Const_cs c2),sk2
+          lookup_canonical_conversion env (proji, Const_cs c2),sk2
     with Not_found ->
-      let (c, cs) = lookup_canonical_conversion (proji,Default_cs) in
+      let (c, cs) = lookup_canonical_conversion env (proji,Default_cs) in
         (c,cs),[]
   in
   let t', { o_DEF = c; o_CTX = ctx; o_INJ=n; o_TABS = bs;
@@ -273,6 +269,7 @@ let check_conv_record env sigma (t1,sk1) (t2,sk2) =
     | Some c -> (* A primitive projection applied to c *)
       let ty = Retyping.get_type_of ~lax:true env sigma c in
       let (i,u), ind_args =
+        (* Are we sure that ty is not an evar? *)
         try Inductiveops.find_mrectype env sigma ty
         with _ -> raise Not_found
       in Stack.append_app_list ind_args Stack.empty, c, sk1
@@ -387,7 +384,7 @@ let ise_stack2 no_app env evd f sk1 sk2 =
         | UnifFailure _ as x -> fail x)
       | UnifFailure _ as x -> fail x)
     | Stack.Proj (p1)::q1, Stack.Proj (p2)::q2 ->
-       if Projection.Repr.equal (Projection.repr p1) (Projection.repr p2)
+       if QProjection.Repr.equal env (Projection.repr p1) (Projection.repr p2)
        then ise_stack2 true i q1 q2
        else fail (UnifFailure (i, NotSameHead))
     | Stack.Fix (((li1, i1),(_,tys1,bds1 as recdef1)),a1)::q1,
@@ -429,7 +426,7 @@ let exact_ise_stack2 env evd f sk1 sk2 =
           (fun i -> ise_stack2 i a1 a2)]
       else UnifFailure (i,NotSameHead)
     | Stack.Proj (p1)::q1, Stack.Proj (p2)::q2 ->
-       if Projection.Repr.equal (Projection.repr p1) (Projection.repr p2)
+       if QProjection.Repr.equal env (Projection.repr p1) (Projection.repr p2)
        then ise_stack2 i q1 q2
        else (UnifFailure (i, NotSameHead))
     | Stack.App _ :: _, Stack.App _ :: _ ->
@@ -566,11 +563,16 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
     in
     let compare_heads evd =
       match EConstr.kind evd term, EConstr.kind evd term' with
-      | Const (c, u), Const (c', u') when Constant.equal c c' ->
-        let u = EInstance.kind evd u and u' = EInstance.kind evd u' in
-        check_strict evd u u'
+      | Const (c, u), Const (c', u') when QConstant.equal env c c' ->
+        if Int.equal (Stack.args_size sk) 1 && Environ.is_array_type env c
+        then
+          let u = EInstance.kind evd u and u' = EInstance.kind evd u' in
+          compare_cumulative_instances evd [|Univ.Variance.Irrelevant|] u u'
+        else
+          let u = EInstance.kind evd u and u' = EInstance.kind evd u' in
+          check_strict evd u u'
       | Const _, Const _ -> UnifFailure (evd, NotSameHead)
-      | Ind ((mi,i) as ind , u), Ind (ind', u') when Names.eq_ind ind ind' ->
+      | Ind ((mi,i) as ind , u), Ind (ind', u') when Names.Ind.CanOrd.equal ind ind' ->
         if EInstance.is_empty u && EInstance.is_empty u' then Success evd
         else
           let u = EInstance.kind evd u and u' = EInstance.kind evd u' in
@@ -589,7 +591,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
           end
       | Ind _, Ind _ -> UnifFailure (evd, NotSameHead)
       | Construct (((mi,ind),ctor as cons), u), Construct (cons', u')
-        when Names.eq_constructor cons cons' ->
+        when Names.Construct.CanOrd.equal cons cons' ->
         if EInstance.is_empty u && EInstance.is_empty u' then Success evd
         else
           let u = EInstance.kind evd u and u' = EInstance.kind evd u' in
@@ -831,7 +833,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
         in
         ise_try evd [f1; f2]
 
-        | Proj (p, c), Proj (p', c') when Projection.repr_equal p p' ->
+        | Proj (p, c), Proj (p', c') when QProjection.Repr.equal env (Projection.repr p) (Projection.repr p') ->
           let f1 i =
             ise_and i
             [(fun i -> evar_conv_x flags env i CONV c c');
@@ -844,7 +846,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
             ise_try evd [f1; f2]
 
         (* Catch the p.c ~= p c' cases *)
-        | Proj (p,c), Const (p',u) when Constant.equal (Projection.constant p) p' ->
+        | Proj (p,c), Const (p',u) when QConstant.equal env (Projection.constant p) p' ->
           let res =
             try Some (destApp evd (Retyping.expand_projection env evd p c []))
             with Retyping.RetypeError _ -> None
@@ -855,7 +857,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
                 appr2
             | None -> UnifFailure (evd,NotSameHead))
 
-        | Const (p,u), Proj (p',c') when Constant.equal p (Projection.constant p') ->
+        | Const (p,u), Proj (p',c') when QConstant.equal env p (Projection.constant p') ->
           let res =
             try Some (destApp evd (Retyping.expand_projection env evd p' c' []))
             with Retyping.RetypeError _ -> None
@@ -1213,12 +1215,22 @@ let default_occurrences_selection ?(allowed_evars=AllowedEvars.all) ts n =
   (default_occurrence_test ~allowed_evars ts,
    List.init n (fun _ -> default_occurrence_selection))
 
-let apply_on_subterm env evd fixedref f test c t =
+let occur_evars sigma evs c =
+  if Evar.Set.is_empty evs then false
+  else
+    let rec occur_rec c = match EConstr.kind sigma c with
+      | Evar (sp,_) when Evar.Set.mem sp evs -> raise Occur
+      | _ -> EConstr.iter sigma occur_rec c
+    in
+    try occur_rec c; false with Occur -> true
+
+let apply_on_subterm env evd fixed f test c t =
   let test = test env evd c in
   let prc env evd = Termops.Internal.print_constr_env env evd in
   let evdref = ref evd in
+  let fixedref = ref fixed in
   let rec applyrec (env,(k,c) as acc) t =
-    if Evar.Set.exists (fun fixed -> occur_evar !evdref fixed t) !fixedref then
+    if occur_evars !evdref !fixedref t then
       match EConstr.kind !evdref t with
       | Evar (ev, args) when Evar.Set.mem ev !fixedref -> t
       | _ -> map_constr_with_binders_left_to_right !evdref
@@ -1231,7 +1243,8 @@ let apply_on_subterm env evd fixedref f test c t =
         try test env !evdref k c t
         with e when CErrors.noncritical e -> assert false in
      if b then (if debug_ho_unification () then Feedback.msg_debug (Pp.str "succeeded");
-                let evd', t' = f !evdref k t in
+                let evd', fixed, t' = f !evdref !fixedref k t in
+                fixedref := fixed;
                 evdref := evd'; t')
      else (
        if debug_ho_unification () then Feedback.msg_debug (Pp.str "failed");
@@ -1240,7 +1253,7 @@ let apply_on_subterm env evd fixedref f test c t =
         applyrec acc t))
   in
   let t' = applyrec (env,(0,c)) t in
-  !evdref, t'
+  !evdref, !fixedref, t'
 
 let filter_possible_projections evd c ty ctxt args =
   (* Since args in the types will be replaced by holes, we count the
@@ -1301,6 +1314,7 @@ let check_selected_occs env sigma c occ occs =
      raise (PretypeError (env,sigma,NoOccurrenceFound (c,None)))
      else ()
 
+(* Error local to the module *)
 exception TypingFailed of evar_map
 
 let set_of_evctx l =
@@ -1330,12 +1344,6 @@ let thin_evars env sigma sign c =
   in
   let c' = applyrec (env,0) c in
   (!sigma, c')
-
-exception NotFoundInstance of exn
-let () = CErrors.register_handler (function
-    | NotFoundInstance e ->
-      Some Pp.(str "Failed to instantiate evar: " ++ CErrors.print e)
-    | _ -> None)
 
 let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
   try
@@ -1377,8 +1385,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
     | _, _, [] -> []
     | _ -> anomaly (Pp.str "Signature or instance are shorter than the occurrences list.")
   in
-  let fixed = ref Evar.Set.empty in
-  let rec set_holes env_rhs evd rhs = function
+  let rec set_holes env_rhs evd fixed rhs = function
   | (id,idty,c,cty,evsref,filter,occs)::subst ->
      let c = nf_evar evd c in
      if debug_ho_unification () then
@@ -1387,7 +1394,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
                                 prc env_rhs evd c ++ str" in " ++
                                 prc env_rhs evd rhs);
      let occ = ref 1 in
-     let set_var evd k inst =
+     let set_var evd fixed k inst =
        let oc = !occ in
        if debug_ho_unification () then
        (Feedback.msg_debug Pp.(str"Found one occurrence");
@@ -1395,10 +1402,10 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
        incr occ;
        match occs with
        | AtOccurrences occs ->
-          if Locusops.is_selected oc occs then evd, mkVar id.binder_name
-          else evd, inst
+          if Locusops.is_selected oc occs then evd, fixed, mkVar id.binder_name
+          else evd, fixed, inst
        | Unspecified prefer_abstraction ->
-          let evd, evty = set_holes env_rhs evd cty subst in
+          let evd, fixed, evty = set_holes env_rhs evd fixed cty subst in
           let evty = nf_evar evd evty in
           if debug_ho_unification () then
             Feedback.msg_debug Pp.(str"abstracting one occurrence " ++ prc env_rhs evd inst ++
@@ -1414,21 +1421,21 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
                 env_evar_unf evd evty
             else evd, evty in
           let (evd, evk) = new_pure_evar sign evd evty ~filter in
+          let fixed = Evar.Set.add evk fixed in
           evsref := (evk,evty,inst,prefer_abstraction)::!evsref;
-          fixed := Evar.Set.add evk !fixed;
-          evd, mkEvar (evk, instance)
+          evd, fixed, mkEvar (evk, instance)
      in
-     let evd, rhs' = apply_on_subterm env_rhs evd fixed set_var test c rhs in
+     let evd, fixed, rhs' = apply_on_subterm env_rhs evd fixed set_var test c rhs in
      if debug_ho_unification () then
        Feedback.msg_debug Pp.(str"abstracted: " ++ prc env_rhs evd rhs');
      let () = check_selected_occs env_rhs evd c !occ occs in
      let env_rhs' = push_named (NamedDecl.LocalAssum (id,idty)) env_rhs in
-     set_holes env_rhs' evd rhs' subst
-  | [] -> evd, rhs in
+     set_holes env_rhs' evd fixed rhs' subst
+  | [] -> evd, fixed, rhs in
 
   let subst = make_subst (ctxt,args,argoccs) in
 
-  let evd, rhs' = set_holes env_rhs evd rhs subst in
+  let evd, _, rhs' = set_holes env_rhs evd Evar.Set.empty rhs subst in
   let rhs' = nf_evar evd rhs' in
   (* Thin evars making the term typable in env_evar *)
   let evd, rhs' = thin_evars env_evar evd ctxt rhs' in
@@ -1480,9 +1487,8 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
                           List.exists (fun c -> isVarId evd id (EConstr.of_constr c)) l ->
                  instantiate_evar evar_unify flags env_rhs evd ev vid
                | _ -> evd)
-           with e when CErrors.noncritical e ->
-             let e, info = Exninfo.capture e in
-             Exninfo.iraise (NotFoundInstance e, info)
+           with IllTypedInstance _ (* from instantiate_evar *) | TypingFailed _ ->
+              user_err (Pp.str "Cannot find an instance.")
          else
            ((if debug_ho_unification () then
                let evi = Evd.find evd evk in
@@ -1611,12 +1617,15 @@ let apply_conversion_problem_heuristic flags env evd with_ho pbty t1 t2 =
      in
       Success (solve_refl ~can_drop:true f flags env evd
                  (position_problem true pbty) evk1 args1 args2)
-  | Evar ev1, Evar ev2 when app_empty ->
+  | Evar (evk1,_ as ev1), Evar ev2 when app_empty ->
     (* solve_evar_evar handles the cases ev1 and/or ev2 are frozen *)
-      Success (solve_evar_evar ~force:true
+      (try
+        Success (solve_evar_evar ~force:true
                  (evar_define evar_unify flags ~choose:true)
                  evar_unify flags env evd
                  (position_problem true pbty) ev1 ev2)
+      with IllTypedInstance (env,t,u) ->
+            UnifFailure (evd,InstanceNotSameType (evk1,env,t,u)))
   | Evar ev1,_ when is_evar_allowed flags (fst ev1) && Array.length l1 <= Array.length l2 ->
       (* On "?n t1 .. tn = u u1 .. u(n+p)", try first-order unification *)
       (* and otherwise second-order matching *)
@@ -1699,7 +1708,7 @@ let solve_unconstrained_impossible_cases env evd =
       let evd' = Evd.merge_context_set Evd.univ_flexible_alg ?loc evd' ctx in
       let ty = j_type j in
       let flags = default_flags env in
-      instantiate_evar evar_unify flags env evd' evk ty
+      instantiate_evar evar_unify flags env evd' evk ty (* should we protect from raising IllTypedInstance? *)
     | _ -> evd') evd evd
 
 let solve_unif_constraints_with_heuristics env

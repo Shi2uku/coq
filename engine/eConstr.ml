@@ -127,9 +127,9 @@ let isRef sigma c = match kind sigma c with
 let isRefX sigma x c =
   let open GlobRef in
   match x, kind sigma c with
-  | ConstRef c, Const (c', _) -> Constant.equal c c'
-  | IndRef i, Ind (i', _) -> eq_ind i i'
-  | ConstructRef i, Construct (i', _) -> eq_constructor i i'
+  | ConstRef c, Const (c', _) -> Constant.CanOrd.equal c c'
+  | IndRef i, Ind (i', _) -> Ind.CanOrd.equal i i'
+  | ConstructRef i, Construct (i', _) -> Construct.CanOrd.equal i i'
   | VarRef id, Var id' -> Id.equal id id'
   | _ -> false
 
@@ -452,6 +452,9 @@ let eq_universes env sigma cstrs cv_pb refargs l l' =
     let open GlobRef in
     let open UnivProblem in
     match refargs with
+    | Some (ConstRef c, 1) when Environ.is_array_type env c ->
+      cstrs := compare_cumulative_instances cv_pb true [|Univ.Variance.Irrelevant|] l l' !cstrs;
+      true
     | None | Some (ConstRef _, _) ->
       cstrs := enforce_eq_instances_univs true l l' !cstrs; true
     | Some (VarRef _, _) -> assert false (* variables don't have instances *)
@@ -514,7 +517,7 @@ let compare_head_gen_proj env sigma equ eqs eqc' nargs m n =
   | Proj (p, c), App (f, args)
   | App (f, args), Proj (p, c) ->
       (match kind f with
-      | Const (p', u) when Constant.equal (Projection.constant p) p' ->
+      | Const (p', u) when Environ.QConstant.equal env (Projection.constant p) p' ->
           let npars = Projection.npars p in
           if Array.length args == npars + 1 then
             eqc' 0 c args.(npars)
@@ -562,6 +565,9 @@ let universes_of_constr sigma c =
       fold sigma aux (aux s concl) c
     | Array (u,_,_,_) ->
       let s = LSet.fold LSet.add (Instance.levels (EInstance.kind sigma u)) s in
+      fold sigma aux s c
+    | Case (_,_,CaseInvert {univs;args=_},_,_) ->
+      let s = LSet.fold LSet.add (Instance.levels (EInstance.kind sigma univs)) s in
       fold sigma aux s c
     | _ -> fold sigma aux s c
   in aux LSet.empty c
@@ -624,6 +630,9 @@ let subst_var subst c = of_constr (Vars.subst_var subst (to_constr c))
 
 let subst_univs_level_constr subst c =
   of_constr (Vars.subst_univs_level_constr subst (to_constr c))
+
+let subst_univs_constr subst c =
+  of_constr (UnivSubst.subst_univs_constr subst (to_constr c))
 
 (** Operations that dot NOT commute with evar-normalization *)
 let noccurn sigma n term =

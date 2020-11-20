@@ -121,8 +121,8 @@ let destruction_arg_of_constr (c,lbind as clbind) = match lbind with
     end
   | _ -> ElimOnConstr clbind
 
-let mkNumeral n =
-  Numeral (NumTok.Signed.of_int_string (string_of_int n))
+let mkNumber n =
+  Number (NumTok.Signed.of_int_string (string_of_int n))
 
 let mkTacCase with_evar = function
   | [(clear,ElimOnConstr cl),(None,None),None],None ->
@@ -130,7 +130,7 @@ let mkTacCase with_evar = function
   (* Reinterpret numbers as a notation for terms *)
   | [(clear,ElimOnAnonHyp n),(None,None),None],None ->
       TacCase (with_evar,
-        (clear,(CAst.make @@ CPrim (mkNumeral n),
+        (clear,(CAst.make @@ CPrim (mkNumber n),
          NoBindings)))
   (* Reinterpret ident as notations for variables in the context *)
   (* because we don't know if they are quantified or not *)
@@ -234,9 +234,7 @@ GRAMMAR EXTEND Gram
   ;
   occs_nums:
     [ [ nl = LIST1 nat_or_var -> { OnlyOccurrences nl }
-      | "-"; n = nat_or_var; nl = LIST0 int_or_var ->
-          (* have used int_or_var instead of nat_or_var for compatibility *)
-         { AllOccurrencesBut (List.map (Locusops.or_var_map abs) (n::nl)) } ] ]
+      | "-"; nl = LIST1 nat_or_var -> { AllOccurrencesBut nl } ] ]
   ;
   occs:
     [ [ "at"; occs = occs_nums -> { occs } | -> { AllOccurrences } ] ]
@@ -280,7 +278,7 @@ GRAMMAR EXTEND Gram
       | "[="; tc = intropatterns; "]" -> { IntroInjection tc } ] ]
   ;
   naming_intropattern:
-    [ [ prefix = pattern_ident -> { IntroFresh prefix }
+    [ [ prefix = pattern_ident -> { IntroFresh prefix.CAst.v }
       | "?" -> { IntroAnonymous }
       | id = ident -> { IntroIdentifier id } ] ]
   ;
@@ -291,7 +289,7 @@ GRAMMAR EXTEND Gram
   ;
   simple_intropattern:
     [ [ pat = simple_intropattern_closed;
-        l = LIST0 ["%"; c = operconstr LEVEL "0" -> { c } ] ->
+        l = LIST0 ["%"; c = term LEVEL "0" -> { c } ] ->
           { let {CAst.loc=loc0;v=pat} = pat in
           let f c pat =
             let loc1 = Constrexpr_ops.constr_loc c in
@@ -320,7 +318,7 @@ GRAMMAR EXTEND Gram
   with_bindings:
     [ [ "with"; bl = bindings -> { bl } | -> { NoBindings } ] ]
   ;
-  red_flags:
+  red_flag:
     [ [ IDENT "beta" -> { [FBeta] }
       | IDENT "iota" -> { [FMatch;FFix;FCofix] }
       | IDENT "match" -> { [FMatch] }
@@ -337,7 +335,7 @@ GRAMMAR EXTEND Gram
     ] ]
   ;
   strategy_flag:
-    [ [ s = LIST1 red_flags -> { Redops.make_red_flag (List.flatten s) }
+    [ [ s = LIST1 red_flag -> { Redops.make_red_flag (List.flatten s) }
       | d = delta_flag -> { all_with d }
     ] ]
   ;
@@ -379,9 +377,11 @@ GRAMMAR EXTEND Gram
           { {onhyps=None; concl_occs=occs} }
       | "*"; "|-"; occs=concl_occ ->
           { {onhyps=None; concl_occs=occs} }
-      | hl=LIST0 hypident_occ SEP","; "|-"; occs=concl_occ ->
+      | "|-"; occs=concl_occ ->
+          { {onhyps=Some []; concl_occs=occs} }
+      | hl = LIST1 hypident_occ SEP ","; "|-"; occs=concl_occ ->
           { {onhyps=Some hl; concl_occs=occs} }
-      | hl=LIST0 hypident_occ SEP"," ->
+      | hl = LIST1 hypident_occ SEP "," ->
           { {onhyps=Some hl; concl_occs=NoOccurrences} } ] ]
   ;
   clause_dft_concl:
@@ -450,6 +450,11 @@ GRAMMAR EXTEND Gram
   ;
   as_or_and_ipat:
     [ [ "as"; ipat = or_and_intropattern_loc -> { Some ipat }
+      | "as"; ipat = equality_intropattern ->
+        { match ipat with
+          | IntroRewrite _ -> user_err Pp.(str "Disjunctive/conjunctive pattern expected.")
+          | IntroInjection _ -> user_err Pp.(strbrk "Found an injection pattern while a disjunctive/conjunctive pattern was expected; use " ++ str "\"injection as pattern\"" ++ strbrk " instead.")
+          | _ -> assert false }
       | -> { None } ] ]
   ;
   eqn_ipat:
@@ -460,7 +465,7 @@ GRAMMAR EXTEND Gram
     [ [ "as"; id = ident -> { Names.Name.Name id } | -> { Names.Name.Anonymous } ] ]
   ;
   by_tactic:
-    [ [ "by"; tac = tactic_expr LEVEL "3" -> { Some tac }
+    [ [ "by"; tac = ltac_expr LEVEL "3" -> { Some tac }
     | -> { None } ] ]
   ;
   rewriter :

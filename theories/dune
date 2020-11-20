@@ -14,16 +14,14 @@
    coq.plugins.cc
    coq.plugins.firstorder
 
-   coq.plugins.numeral_notation
-   coq.plugins.string_notation
+   coq.plugins.number_string_notation
    coq.plugins.int63_syntax
-   coq.plugins.r_syntax
    coq.plugins.float_syntax
 
    coq.plugins.btauto
    coq.plugins.rtauto
 
-   coq.plugins.setoid_ring
+   coq.plugins.ring
    coq.plugins.nsatz
    coq.plugins.omega
 

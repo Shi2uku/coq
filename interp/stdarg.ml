@@ -25,6 +25,9 @@ let wit_bool : bool uniform_genarg_type =
 let wit_int : int uniform_genarg_type =
   make0 "int"
 
+let wit_nat : int uniform_genarg_type =
+  make0 "nat"
+
 let wit_string : string uniform_genarg_type =
   make0 "string"
 
@@ -37,8 +40,10 @@ let wit_int_or_var =
 let wit_ident =
   make0 "ident"
 
-let wit_var =
-  make0 ~dyn:(val_tag (topwit wit_ident)) "var"
+let wit_hyp =
+  make0 ~dyn:(val_tag (topwit wit_ident)) "hyp"
+
+let wit_var = wit_hyp
 
 let wit_ref = make0 "ref"
 
@@ -59,6 +64,7 @@ let wit_clause_dft_concl  =
 (** Aliases for compatibility *)
 
 let wit_integer = wit_int
+let wit_natural = wit_nat
 let wit_preident = wit_pre_ident
 let wit_reference = wit_ref
 let wit_global = wit_ref

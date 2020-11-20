@@ -37,6 +37,7 @@ Local Notation "0" := O.
 Definition eq_S := f_equal S.
 Definition f_equal_nat := f_equal (A:=nat).
 
+#[global]
 Hint Resolve f_equal_nat: core.
 
 (** The predecessor function *)
@@ -53,12 +54,14 @@ Qed.
 (** Injectivity of successor *)
 
 Definition eq_add_S n m (H: S n = S m): n = m := f_equal pred H.
+#[global]
 Hint Immediate eq_add_S: core.
 
 Theorem not_eq_S : forall n m:nat, n <> m -> S n <> S m.
 Proof.
   red; auto.
 Qed.
+#[global]
 Hint Resolve not_eq_S: core.
 
 Definition IsSucc (n:nat) : Prop :=
@@ -73,12 +76,14 @@ Theorem O_S : forall n:nat, 0 <> S n.
 Proof.
   discriminate.
 Qed.
+#[global]
 Hint Resolve O_S: core.
 
 Theorem n_Sn : forall n:nat, n <> S n.
 Proof.
-  induction n; auto.
+  intro n; induction n; auto.
 Qed.
+#[global]
 Hint Resolve n_Sn: core.
 
 (** Addition *)
@@ -88,14 +93,17 @@ Infix "+" := Nat.add : nat_scope.
 
 Definition f_equal2_plus := f_equal2 plus.
 Definition f_equal2_nat := f_equal2 (A1:=nat) (A2:=nat). 
+#[global]
 Hint Resolve f_equal2_nat: core.
 
 Lemma plus_n_O : forall n:nat, n = n + 0.
 Proof.
-  induction n; simpl; auto.
+  intro n; induction n; simpl; auto.
 Qed.
 
+#[global]
 Remove Hints eq_refl : core.
+#[global]
 Hint Resolve plus_n_O eq_refl: core.  (* We want eq_refl to have higher priority than plus_n_O *)
 
 Lemma plus_O_n : forall n:nat, 0 + n = n.
@@ -107,6 +115,7 @@ Lemma plus_n_Sm : forall n m:nat, S (n + m) = n + S m.
 Proof.
   intros n m; induction n; simpl; auto.
 Qed.
+#[global]
 Hint Resolve plus_n_Sm: core.
 
 Lemma plus_Sn_m : forall n m:nat, S n + m = S (n + m).
@@ -125,20 +134,23 @@ Notation mult := Nat.mul (only parsing).
 Infix "*" := Nat.mul : nat_scope.
 
 Definition f_equal2_mult := f_equal2 mult.
+#[global]
 Hint Resolve f_equal2_mult: core.
 
 Lemma mult_n_O : forall n:nat, 0 = n * 0.
 Proof.
-  induction n; simpl; auto.
+  intro n; induction n; simpl; auto.
 Qed.
+#[global]
 Hint Resolve mult_n_O: core.
 
 Lemma mult_n_Sm : forall n m:nat, n * m + n = n * S m.
 Proof.
-  intros; induction n as [| p H]; simpl; auto.
+  intros n m; induction n as [| p H]; simpl; auto.
   destruct H; rewrite <- plus_n_Sm; apply eq_S.
   pattern m at 1 3; elim m; simpl; auto.
 Qed.
+#[global]
 Hint Resolve mult_n_Sm: core.
 
 (** Standard associated names *)
@@ -162,20 +174,24 @@ where "n <= m" := (le n m) : nat_scope.
 
 Register le_n as num.nat.le_n.
 
+#[global]
 Hint Constructors le: core.
 (*i equivalent to : "Hints Resolve le_n le_S : core." i*)
 
 Definition lt (n m:nat) := S n <= m.
+#[global]
 Hint Unfold lt: core.
 
 Infix "<" := lt : nat_scope.
 
 Definition ge (n m:nat) := m <= n.
+#[global]
 Hint Unfold ge: core.
 
 Infix ">=" := ge : nat_scope.
 
 Definition gt (n m:nat) := m < n.
+#[global]
 Hint Unfold gt: core.
 
 Infix ">" := gt : nat_scope.
@@ -192,7 +208,7 @@ Register gt as num.nat.gt.
 
 Theorem le_pred : forall n m, n <= m -> pred n <= pred m.
 Proof.
-induction 1; auto. destruct m; simpl; auto.
+induction 1 as [|m _]; auto. destruct m; simpl; auto.
 Qed.
 
 Theorem le_S_n : forall n m, S n <= S m -> n <= m.
@@ -202,7 +218,7 @@ Qed.
 
 Theorem le_0_n : forall n, 0 <= n.
 Proof.
- induction n; constructor; trivial.
+ intro n; induction n; constructor; trivial.
 Qed.
 
 Theorem le_n_S : forall n m, n <= m -> S n <= S m.
@@ -215,7 +231,7 @@ Qed.
 Theorem nat_case :
  forall (n:nat) (P:nat -> Prop), P 0 -> (forall m:nat, P (S m)) -> P n.
 Proof.
-  induction n; auto.
+  intros n P IH0 IHS; case n; auto.
 Qed.
 
 (** Principle of double induction *)
@@ -226,8 +242,9 @@ Theorem nat_double_ind :
    (forall n:nat, R (S n) 0) ->
    (forall n m:nat, R n m -> R (S n) (S m)) -> forall n m:nat, R n m.
 Proof.
+  intros R ? ? ? n.
   induction n; auto.
-  destruct m; auto.
+  intro m; destruct m; auto.
 Qed.
 
 (** Maximum and minimum : definitions and specifications *)
@@ -237,28 +254,28 @@ Notation min := Nat.min (only parsing).
 
 Lemma max_l n m : m <= n -> Nat.max n m = n.
 Proof.
- revert m; induction n; destruct m; simpl; trivial.
+ revert m; induction n as [|n IHn]; intro m; destruct m; simpl; trivial.
  - inversion 1.
  - intros. apply f_equal, IHn, le_S_n; trivial.
 Qed.
 
 Lemma max_r n m : n <= m -> Nat.max n m = m.
 Proof.
- revert m; induction n; destruct m; simpl; trivial.
+ revert m; induction n as [|n IHn]; intro m; destruct m; simpl; trivial.
  - inversion 1.
  - intros. apply f_equal, IHn, le_S_n; trivial.
 Qed.
 
 Lemma min_l n m : n <= m -> Nat.min n m = n.
 Proof.
- revert m; induction n; destruct m; simpl; trivial.
+ revert m; induction n as [|n IHn]; intro m; destruct m; simpl; trivial.
  - inversion 1.
  - intros. apply f_equal, IHn, le_S_n; trivial.
 Qed.
 
 Lemma min_r n m : m <= n -> Nat.min n m = m.
 Proof.
- revert m; induction n; destruct m; simpl; trivial.
+ revert m; induction n as [|n IHn]; intro m; destruct m; simpl; trivial.
  - inversion 1.
  - intros. apply f_equal, IHn, le_S_n; trivial.
 Qed.
@@ -267,7 +284,7 @@ Qed.
 Lemma nat_rect_succ_r {A} (f: A -> A) (x:A) n :
   nat_rect (fun _ => A) x (fun _ => f) (S n) = nat_rect (fun _ => A) (f x) (fun _ => f) n.
 Proof.
-  induction n; intros; simpl; rewrite <- ?IHn; trivial.
+  induction n as [|n IHn]; intros; simpl; rewrite <- ?IHn; trivial.
 Qed.
 
 Theorem nat_rect_plus :
@@ -275,5 +292,5 @@ Theorem nat_rect_plus :
     nat_rect (fun _ => A) x (fun _ => f) (n + m) =
       nat_rect (fun _ => A) (nat_rect (fun _ => A) x (fun _ => f) m) (fun _ => f) n.
 Proof.
-  induction n; intros; simpl; rewrite ?IHn; trivial.
+  intro n; induction n as [|n IHn]; intros; simpl; rewrite ?IHn; trivial.
 Qed.

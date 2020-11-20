@@ -135,8 +135,8 @@ lazymatch T with
    rename H2 into H; find_equiv H |
    clear H]
 | forall x : ?t, _ =>
-  let a := fresh "a" with
-      H1 := fresh "H" in
+  let a := fresh "a" in
+  let H1 := fresh "H" in
     evar (a : t); pose proof (H a) as H1; unfold a in H1;
     clear a; clear H; rename H1 into H; find_equiv H
 | ?A <-> ?B => idtac
@@ -203,7 +203,7 @@ Set Implicit Arguments.
 Lemma decide_left : forall (C:Prop) (decide:{C}+{~C}),
   C -> forall P:{C}+{~C}->Prop, (forall H:C, P (left _ H)) -> P decide.
 Proof.
-  intros; destruct decide.
+  intros C decide H P H0; destruct decide.
   - apply H0.
   - contradiction.
 Qed.
@@ -211,7 +211,7 @@ Qed.
 Lemma decide_right : forall (C:Prop) (decide:{C}+{~C}),
   ~C -> forall P:{C}+{~C}->Prop, (forall H:~C, P (right _ H)) -> P decide.
 Proof.
-  intros; destruct decide.
+  intros C decide H P H0; destruct decide.
   - contradiction.
   - apply H0.
 Qed.
@@ -245,12 +245,15 @@ Tactic Notation "clear" "dependent" hyp(h) :=
 Tactic Notation "revert" "dependent" hyp(h) :=
  generalize dependent h.
 
-(** Provide an error message for dependent induction that reports an import is
-required to use it. Importing Coq.Program.Equality will shadow this notation
-with the actual [dependent induction] tactic. *)
+(** Provide an error message for dependent induction/dependent destruction that
+    reports an import is required to use it. Importing Coq.Program.Equality will
+    shadow this notation with the actual tactics. *)
 
 Tactic Notation "dependent" "induction" ident(H) :=
   fail "To use dependent induction, first [Require Import Coq.Program.Equality.]".
+
+Tactic Notation "dependent" "destruction" ident(H) :=
+  fail "To use dependent destruction, first [Require Import Coq.Program.Equality.]".
 
 (** *** [inversion_sigma] *)
 (** The built-in [inversion] will frequently leave equalities of
@@ -336,5 +339,6 @@ Tactic Notation "assert_fails" tactic3(tac) :=
   assert_fails tac.
 
 Create HintDb rewrite discriminated.
+#[global]
 Hint Variables Opaque : rewrite.
 Create HintDb typeclass_instances discriminated.

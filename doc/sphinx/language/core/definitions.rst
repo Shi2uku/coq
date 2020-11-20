@@ -13,15 +13,18 @@ Let-in definitions
 .. prodn::
    term_let ::= let @name {? : @type } := @term in @term
    | let @name {+ @binder } {? : @type } := @term in @term
-   | let ( {*, @name } ) {? {? as @name } return @term100 } := @term in @term
-   | let ' @pattern := @term {? return @term100 } in @term
-   | let ' @pattern in @pattern := @term return @term100 in @term
+   | @destructuring_let
 
-:n:`let @ident := @term in @term’`
-denotes the local binding of :n:`@term` to the variable
-:n:`@ident` in :n:`@term`’. There is a syntactic sugar for let-in
-definition of functions: :n:`let @ident {+ @binder} := @term in @term’`
-stands for :n:`let @ident := fun {+ @binder} => @term in @term’`.
+:n:`let @ident := @term__1 in @term__2` represents the local binding of
+the variable :n:`@ident` to the value :n:`@term__1` in :n:`@term__2`.
+
+:n:`let @ident {+ @binder} := @term__1 in @term__2` is an abbreviation
+for :n:`let @ident := fun {+ @binder} => @term__1 in @term__2`.
+
+.. seealso::
+
+   Extensions of the `let ... in ...` syntax are described in
+   :ref:`irrefutable-patterns`.
 
 .. index::
    single: ... : ... (type cast)
@@ -87,8 +90,8 @@ Section :ref:`typing-rules`.
    computation on :n:`@term`.
 
    These commands also support the :attr:`universes(polymorphic)`,
-   :attr:`universes(monomorphic)`, :attr:`program` and
-   :attr:`canonical` attributes.
+   :attr:`program` (see :ref:`program_definition`),
+   :attr:`canonical` and :attr:`using` attributes.
 
    If :n:`@term` is omitted, :n:`@type` is required and Coq enters proof editing mode.
    This can be used to define a term incrementally, in particular by relying on the :tacn:`refine` tactic.
@@ -140,6 +143,8 @@ Chapter :ref:`Tactics`. The basic assertion command is:
    validated, the proof is generalized into a proof of :n:`forall {* @binder }, @type` and
    the theorem is bound to the name :n:`@ident` in the environment.
 
+   These commands accept the :attr:`program` attribute.  See :ref:`program_lemma`.
+
    Forms using the :n:`with` clause are useful for theorems that are proved by simultaneous induction
    over a mutually inductive assumption, or that assert mutually dependent
    statements in some mutual co-inductive type. It is equivalent to
@@ -156,6 +161,8 @@ Chapter :ref:`Tactics`. The basic assertion command is:
    the lemma in the environment. To know if the use of induction hypotheses is
    correct at some time of the interactive development of a proof, use the
    command :cmd:`Guarded`.
+
+   This command accepts the :attr:`using` attribute.
 
    .. exn:: The term @term has type @type which should be Set, Prop or Type.
       :undocumented:
